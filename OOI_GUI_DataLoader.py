@@ -1,9 +1,11 @@
 """
 This code:
-1. loads the downloaded netcdf data into a nice pandas dataframe.
-3. saves the pandas dataframe as a pickle file in that folder
-It should probably get merged with the DataGrabber later on (once it's done).
-HEG (5/25/2020)
+1. Loads the downloaded netcdf data
+2. Converts the OOI time into Python time
+3. Creates a pandas dataframe with time, pressure, temperature, salinity, and density
+4. Saves the dataframe as a pickle file in the output folder
+Dependencies: numpy, datetime, netCDF4, pandas, sys, os, ooi_mod
+HEG (5/26/2020)
 """
 
 
