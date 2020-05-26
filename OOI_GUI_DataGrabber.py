@@ -5,12 +5,15 @@ import time
 import matplotlib.pyplot as plt
 import netCDF4 as nc
 import pandas as pd
-from datetime import datetime
+from datetime import datetime,timedelta
 import warnings
+import sys
 
-# Please insert your API Username and Token here
-API_USERNAME = ''
-API_TOKEN = ''
+# # Please insert your API Username and Token here
+# API_USERNAME = ''
+# API_TOKEN = ''
+API_USERNAME = 'OOIAPI-YMXPV7NOB6V80B'
+API_TOKEN = 'C5UE5NIZ8UK'
 
 # Create a function to get the data files stored on THREDDS server
 def get_data(url):
@@ -157,7 +160,7 @@ elif int(my_choice) == 4: # Entire Time Series
 		start_time = station_start_time
 		end_time = station_end_time
 	else:
-		exit()
+		sys.exit()
 
 elif int(my_choice) == 5: # Custom Range
 	print('Possible Time Range: ',station_start_time,' to ',station_end_time,'\n')
@@ -196,25 +199,28 @@ data_request_url ='/'.join((api_base_url,site,node,instrument,method,stream))
 r = requests.get(data_request_url, params=params, auth=(API_USERNAME, API_TOKEN))
 data = r.json()
 
-if 'message' in data:
+if '404' in data:
 	print('No data available for this time period. Please try again!\n')
-	exit()
+	sys.exit()
+elif 'Authentication failed' in data:
+  print('Please check your login credentials for typos.')
+  sys.exit()
 
 url = data['allURLs'][0]
 print('THREDDS Server URL:',url)
 
 # Get the datasets
 # We have to wait for the data to appear on the server, try every 10 seconds until it is there
-# Timeout after 3 minutes (if I've done my job right, this should never happen)
+# Timeout after 8 minutes  (if I've done my job right, this should never happen)
 print('Waiting for data...')
 selected_datasets = get_data(url)
 tic = time.time()
 while len(selected_datasets) == 0:
-    time.sleep(10)
+    time.sleep(15)
     print('Waiting...')
     selected_datasets = get_data(url)
     toc = time.time() - tic
-    if toc > 180:
+    if int(my_choice) < 4 and toc > 480:
     	print('Something is wrong... Exiting now.')
     	break
     
@@ -223,3 +229,5 @@ if len(selected_datasets) == 1:
 	ds = nc.Dataset(selected_datasets[0])
 else:
 	ds = nc.MFDataset(selected_datasets)
+
+print('Data is loaded!')
