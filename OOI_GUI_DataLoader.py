@@ -17,26 +17,19 @@ import sys, os
 import ooi_mod # module with the directory creation function
 from datetime import datetime, timedelta, date
 
-get the current working directory then only keep name up 2 levels
+# get the current working directory then only keep name up 2 levels
 # this will be used as the root for /code, /ooi_data, /ooi_output:
 dir_path = os.getcwd()
 a = dir_path.split('/') # makes a list out of the path name
 del a[-2:]# remove last two directories
 dir_path = '/'.join(a)
 
-# make an input data directory:
-in_dir = dir_path + '/ooi_data'
-ooi_mod.make_dir(in_dir)
-
 # make an output directory for the data
-out_dir = dir_path + 'ooi_output'
+out_dir = dir_path + '/ooi_output'
 ooi_mod.make_dir(out_dir)
 
-# load the netcdf data:
-ds = nc.MFDataset(in_dir + selected_datasets)
 
-fname = '../../../output/ocn506/test.nc'
-ds=nc.Dataset(fname)
+####
 
 # relevant fields from netcdf file
 flds = ['time','pressure','practical_salinity','temp','density']
@@ -68,12 +61,12 @@ df.set_index('time',inplace=True)
 # replace fill values with nans:
 df[df==-9999999.0]=np.nan
 
-# get a name for the output pickle file:
-fname = selected_datasets[0]
-fname = fname.split('.') # makes a list out of the path name
-save_name = out_dir + fname[0] + '.p'
+# write a name for the output pickle file:
+fname = #user inputs
+save_name = out_dir + fname + '.p'
 # save the dataframe as a pickle file
 df.to_pickle(save_name)
-# save the metadata as a pickle file:
-pickle.dump(units, open('meta_'+save_name, 'wb')) # 'wb' is for write binary
+
+# # save the metadata as a pickle file:
+# pickle.dump(units, open('meta_'+save_name, 'wb')) # 'wb' is for write binary
 

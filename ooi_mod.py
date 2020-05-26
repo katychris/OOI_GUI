@@ -6,6 +6,9 @@ HEG (5/25/2020)
 # imports
 import os, sys, shutil
 from datetime import timedelta, datetime
+import requests
+import re
+
 
 def make_dir(dirname, clean=False):
     """
@@ -44,3 +47,31 @@ def ooi_to_datetime(datenum,t0):
     FF = timedelta(milliseconds=int(round(FF)))
     
     return DD + HH + MM + SS + FF
+
+
+# Create a function to get the data files stored on THREDDS server
+def get_data(url):
+  '''Function to grab all data from specified directory'''
+  tds_url = 'https://opendap.oceanobservatories.org/thredds/dodsC'
+  datasets = requests.get(url).text
+  urls = re.findall(r'href=[\'"]?([^\'" >]+)', datasets)
+  x = re.findall(r'(ooi/.*?.nc)', datasets)
+  for i in x:
+    if i.endswith('.nc') == False:
+      x.remove(i)
+  for i in x:
+    try:
+      float(i[-4])
+    except:
+      x.remove(i)
+  datasets = [os.path.join(tds_url, i) for i in x]
+
+  # Remove extraneous data files if necessary
+  # This makes sure that the stream and the file match
+  catalog_rms = url.split('/')[-2][20:]
+  selected_datasets = []
+  for d in datasets:
+    if catalog_rms == d.split('/')[-1].split('_20')[0][15:]:
+      selected_datasets.append(d + '#fillmismatch') # Add #fillmismatch to deal with a bug
+  selected_datasets = sorted(selected_datasets)
+  return selected_datasets
