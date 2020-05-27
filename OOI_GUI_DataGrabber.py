@@ -6,23 +6,27 @@ import requests
 import time
 from datetime import datetime,timedelta, date
 import matplotlib.pyplot as plt
+import xarray as xr
 import ooi_mod # module with the directory creation function
 
 # # Please insert your API Username and Token here
-# API_USERNAME = ''
-# API_TOKEN = ''
+# print('An account with for OOI data portal is required to access this data. '+
+# 	'To create an account, visit: https://ooinet.oceanobservatories.org/ ')
+# API_USERNAME = input('API Username: ')
+# API_TOKEN = input('API Token: ')
 API_USERNAME = 'OOIAPI-YMXPV7NOB6V80B'
 API_TOKEN = 'C5UE5NIZ8UK'
 
 # Create an error if there is no username or token
 class LoginError(Exception):
-    pass
+	pass
 if len(API_USERNAME)==0 or len(API_TOKEN)==0:
-    raise LoginError('Please input your API Username and Token')
+	print()
+	raise LoginError('Please input your API Username and Token')
 
 # Create an error if the time selected by the user is not useable
 class TimeError(Exception):
-  pass
+	pass
 
 # get the current working directory then only keep name up 2 levels
 # this will be used as the root for /code, /ooi_data, /ooi_output:
@@ -86,26 +90,27 @@ station_end_time = datetime.strptime(ted[0:19],'%Y-%m-%dT%H:%M:%S')
 
 # Set up start and end times for a few supplied options
 tos = [[station_end_time - timedelta(days=90),station_end_time],
-[station_end_time - timedelta(days=365),station_end_time],
-[station_start_time,station_start_time + timedelta(days=365)],
+[station_end_time - timedelta(days=183),station_end_time],
+[station_start_time,station_start_time + timedelta(days=183)],
 [station_start_time, station_end_time]]
 
 # Create a list for our pre-supplied options and print it to the screen for user selection
 opts = [tos[0][0].strftime('%Y-%m-%d')+' to '+tos[0][1].strftime('%Y-%m-%d')+' (Last 90 Days)',
-		tos[1][0].strftime('%Y-%m-%d')+' to '+tos[1][1].strftime('%Y-%m-%d')+' (Last 1 Year)',
-		tos[2][0].strftime('%Y-%m-%d')+' to '+tos[2][1].strftime('%Y-%m-%d')+' (First 1 Year)',
+		tos[1][0].strftime('%Y-%m-%d')+' to '+tos[1][1].strftime('%Y-%m-%d')+' (Last 6 Months)',
+		tos[2][0].strftime('%Y-%m-%d')+' to '+tos[2][1].strftime('%Y-%m-%d')+' (First 6 Months)',
 		tos[3][0].strftime('%Y-%m-%d')+' to '+tos[3][1].strftime('%Y-%m-%d')+' (Entire Time Series)',
 		'Custom Date Range']
 my_choice = ooi_mod.list_picker('Time Selection',opts)
 ini = int(my_choice)
 
 # Go through the user's option saving the starts and ends
-if (ini < 4) and (ini>0):
+if (ini < len(opts)-1) and (ini>0):
 	start_time = tos[ini-1][0]
 	end_time = tos[ini-1][1]
+	time_diff = end_time-start_time
 
 # Since loading the entire dataset is slow, I have put a warning in here
-elif ini == 4:
+elif ini == len(opts)-1:
 	print('\nWarning: Using the entire time series can be slow! (Particularly for shallow stations)')
 	checky = input('Are you sure you want to continue y(enter)/n?')
 	if checky.lower().startswith('y') or len(checky)==0:
@@ -114,16 +119,18 @@ elif ini == 4:
 	else:
 		print('\nExiting!')
 		sys.exit()
+	time_diff = end_time-start_time
 
 # Allow for users to put in a custom date range
 elif ini == len(opts):
-	print('Possible Time Range: ',station_start_time,' to ',station_end_time,'\n')
+	print('\nPossible Time Range: ',station_start_time,' to ',station_end_time,'\n')
 	st_time = input('Start Time (YYYY-mm-dd HH:MM:SS):')
 	ed_time = input('End Time (YYYY-mm-dd HH:MM:SS):')
 
 	# Make input into datetime object
-	start_time = datetime.strptime(st_time,'%Y-%m-%d %H:%M:%S')
-	end_time = datetime.strptime(ed_time,'%Y-%m-%d %H:%M:%S')
+	start_time = datetime.strptime(st_time.strip(),'%Y-%m-%d %H:%M:%S')
+	end_time = datetime.strptime(ed_time.strip(),'%Y-%m-%d %H:%M:%S')
+	time_diff = end_time-start_time
 
 	# If the input date range is outside of the given instrument, give an error
 	if ((start_time-station_start_time).days < 0) or ((end_time-station_end_time).days>0):
@@ -148,6 +155,7 @@ data_request_url ='/'.join((api_base_url,site,node,instrument,method,stream))
 
 # Get the THREDDS server link either from our pre-made file or from the API request
 url = []
+fdep = False
 # Find if our THREDDS file exists already
 if os.path.isfile(out_dir+'/THREDDS_Servers.txt'):
 	# Open the file and go through each line
@@ -162,6 +170,7 @@ if os.path.isfile(out_dir+'/THREDDS_Servers.txt'):
 		if (site==l_list[1]) and (start_time==l_list[2]) and (end_time==l_list[3]):
 			if (datetime.now()<datetime.strptime(l_list[4][:-1],'%Y-%m-%dT%H:%M:%S.000Z')+timedelta(days=14)):
 				url = l_list[0]
+				fdep = True
 				print('\nTHREDDS Server URL:',url)
 
 			# Remove the line if the link has been active for longer than 2 weeks
@@ -179,11 +188,11 @@ if not os.path.isfile(out_dir+'/THREDDS_Servers.txt') or (len(url)==0):
 	data = r.json()
 	
 	if 'message' in data:
-		if 'code' in data['message']:
+		if 'code' in data['message'] and data['message']['code']==404:
 			print('Uh oh! No data available for this time period. Please try again!\n')
 			sys.exit()
 		elif 'Authentication failed' in data['message']:
-			print('Please check your login credentials for typos.')
+			print('Authentication failed: Please check your login credentials for typos.')
 			sys.exit()
 
 	url = data['allURLs'][0]
@@ -206,20 +215,50 @@ while len(selected_datasets) == 0:
     if int(my_choice) < 4 and toc > 480:
     	print('Something is wrong... Exiting now.')
     	sys.exit()
+if not fdep:
+	if time_diff.days<730 or 'Deep' in Station:
+		print('Initializing Dataset...')
+		time.sleep(60)
+		selected_datasets = ooi_mod.get_data(url)
+	elif time_diff.days>730 and ('Shallow' in Station):
+		print('Waiting...')
+		time.sleep(30)
+		print('Initializing full dataset for shallow station (15 minutes)...')
+		time.sleep(900)
+		selected_datasets = ooi_mod.get_data(url)
+print('Data is loaded!')
+print('\nExtracting and Saving...')
     
 # We should now be able to get all of the data into a structure using netCDF4
-if len(selected_datasets) == 1:
-	ds = nc.Dataset(selected_datasets[0])
-else:
-	ds = nc.MFDataset(selected_datasets)
+# if len(selected_datasets) == 1:
+if 'Shallow' in Station:
+	ds = xr.open_mfdataset(selected_datasets,combine='nested',concat_dim='obs',drop_variables=
+		['corrected_dissolved_oxygen','density_qc_executed','driver_timestamp',
+		'seawater_pressure_qc_results','practical_salinity_qc_results','provenance',
+		'corrected_dissolved_oxygen_qc_executed','corrected_dissolved_oxygen_qc_results',
+		'seawater_temperature_qc_results','internal_timestamp','seawater_conductivity_qc_results', 
+		'ext_volt0','ingestion_timestamp','port_timestamp','seawater_pressure_qc_executed',
+		'deployment','preferred_timestamp','practical_salinity_qc_executed','seawater_temperature_qc_executed', 
+		'density_qc_results', 'seawater_conductivity_qc_executed','pressure_temp','temperature','pressure',
+		'seawater_conductivity','conductivity','id'])
+	ds = ds.reset_coords(['seawater_pressure','lon','lat','time'])
+elif 'Deep' in Station:
+	ds = xr.open_mfdataset(selected_datasets,combine='nested',concat_dim='obs',drop_variables=
+		['dpc_ctd_seawater_conductivity','conductivity_millisiemens','density_qc_executed',
+		'driver_timestamp','id','practical_salinity_qc_results','provenance','internal_timestamp',
+		'raw_time_microseconds','ingestion_timestamp','conductivity_millisiemens_qc_executed',
+		'port_timestamp','raw_time_seconds','deployment','pressure_qc_results','pressure_qc_executed',
+		'preferred_timestamp','temp_qc_executed','dpc_ctd_seawater_conductivity_qc_results',
+		'practical_salinity_qc_executed','temp_qc_results','conductivity_millisiemens_qc_results',
+		'density_qc_results','dpc_ctd_seawater_conductivity_qc_executed'])
 
-print('Data is loaded!')
+print('Done!')
 
 # Manipulating data
 #---------------------------------------------------------------------------------------------------
 
 # # relevant fields from netcdf file
-# flds = ['time','pressure','practical_salinity','temp','density']
+# flds = ['time','seawater_pressure','practical_salinity','seawater_temperature','density']
 # units = []
 # for jj in range (0,len(flds)):
 #     units.append(ds[flds[jj]].units)
@@ -256,3 +295,17 @@ print('Data is loaded!')
 # df.to_pickle(save_name)
 # # save the metadata as a pickle file:
 # pickle.dump(units, open('meta_'+save_name, 'wb')) # 'wb' is for write binary
+
+
+# Plotting!
+# plt.close('all')
+
+# fig = plt.figure() 
+# ax1 = fig.add_subplot(111)
+# xx = ax1.scatter(ds['time'],ds['seawater_pressure'],c=ds['seawater_temperature']) 
+# ax1.invert_yaxis()
+# plt.colorbar(xx,label='Temperature (degC)')
+# ax1.set_xlabel('Time')
+# ax1.set_ylabel('Pressure (dbar)')
+# ax1.set_xlim([np.nanmin(ds['time']),np.nanmax(ds['time'])])
+# plt.show()
