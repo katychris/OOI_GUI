@@ -124,12 +124,25 @@ elif ini == len(opts)-1:
 # Allow for users to put in a custom date range
 elif ini == len(opts):
 	print('\nPossible Time Range: ',station_start_time,' to ',station_end_time,'\n')
-	st_time = input('Start Time (YYYY-mm-dd HH:MM:SS):')
-	ed_time = input('End Time (YYYY-mm-dd HH:MM:SS):')
+	print('Input Format: YYYY-mm-dd HH:MM:SS')
+	print('Date (YYYY-mm-dd) is required; Time (HH:MM:SS) is optional, default 00:00:00')
+
+	st_time = input('Start Time: ')
+	ed_time = input('End Time: ')
 
 	# Make input into datetime object
-	start_time = datetime.strptime(st_time.strip(),'%Y-%m-%d %H:%M:%S')
-	end_time = datetime.strptime(ed_time.strip(),'%Y-%m-%d %H:%M:%S')
+	if len(st_time)< 10 or len(ed_time)< 10:
+		raise TimeError('No time selected. Please try again!')
+	if len(st_time)==10:
+		start_time = datetime.strptime(st_time[0:10].strip(),'%Y-%m-%d')
+	elif len(st_time) == 19:
+		start_time = datetime.strptime(st_time.strip(),'%Y-%m-%d %H:%M:%S')
+
+	if len(ed_time)==10:
+		end_time = datetime.strptime(ed_time[0:10].strip(),'%Y-%m-%d')
+	elif len(ed_time) == 19:
+		end_time = datetime.strptime(ed_time.strip(),'%Y-%m-%d %H:%M:%S')
+
 	time_diff = end_time-start_time
 
 	# If the input date range is outside of the given instrument, give an error
