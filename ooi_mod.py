@@ -59,7 +59,8 @@ def list_picker(title,data_list,default_val=1):
     my_choice = input('\n Input Selection Number (return='+str(default_val)+'): ')
     if len(my_choice) == 0:
         my_choice = str(default_val)
-    print('\n'+ data_list[int(my_choice)-1])
+    print()
+    print('\33[42m'+ data_list[int(my_choice)-1]+'\33[0m')
 
     return my_choice
 
