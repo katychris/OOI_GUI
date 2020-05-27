@@ -16,7 +16,6 @@ import pandas as pd
 import sys, os
 import ooi_mod # module with the directory creation function
 from datetime import datetime, timedelta, date
-import pickle
 
 # get the current working directory then only keep name up 2 levels
 # this will be used as the root for /code, /ooi_data, /ooi_output:
