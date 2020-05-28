@@ -2,7 +2,7 @@
 This code plots a measured CTD parameter (T, S, P, rho) in depth v time space.
 Meant to be run immediately after 'OOI_GUI_DataLoader.py' script
 Dependencies: sys, os, numpy, pandas, matplotlib.pyplot
-TLW - 5/26/2020
+TLW - 5/28/2020
 """
 
 # Imports
@@ -44,7 +44,7 @@ rho = df['density']
 plt.close('all')
 f = plt.figure()
 f, (ax1, ax2, ax3) = plt.subplots(1,3)
-cm_temp = 'coolwarm'  # assign a colormap to temperature, could use 'thermal' instead
+cm_temp = 'coolwarm'  # assign a colormap to temperature
 cm_ps = 'YiGnBu'  # assign a colormap to practical salinity
 cm_rho = 'cividis'  # assign a colormap to density
 t_utc = 'Time (UTC)'  #assign variable to time label
