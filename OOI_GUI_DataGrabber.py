@@ -19,7 +19,7 @@ parser.add_argument('-f', '--file_update', default=False, type=ooi_mod.boolean_s
 args = parser.parse_args()
 f_update=args.file_update
 
-# Please insert your API Username and Token here
+# # Please insert your API Username and Token here
 print('An account with for OOI data portal is required to access this data. '+
 	'To create an account, visit: https://ooinet.oceanobservatories.org/ ')
 API_USERNAME = input('API Username: ')
@@ -167,6 +167,7 @@ elif ini == len(opts):
 	if ((start_time-station_start_time).days < 0) or ((end_time-station_end_time).days>0):
 		raise TimeError('Please select a time within the given range.')
 	print('\nTime Range: ',start_time,' to ',end_time,'\n')
+
 
 
 # Retrieving Data
@@ -320,6 +321,7 @@ else:
 	ds = nc.Dataset(fname)
 
 
+
 # Manipulating data
 #---------------------------------------------------------------------------------------------------
 
@@ -364,8 +366,6 @@ for jj in range (1,len(flds)):
 
 
 # Plotting initial!
-#---------------------------------------------------------------------------------------------------
-
 # plt.close('all')
 
 # fig = plt.figure() 

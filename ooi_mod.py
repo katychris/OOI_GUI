@@ -2,10 +2,13 @@
 Module of functions for the OOI DataGrabber.
 HEG (5/25/2020)
 """
-
 # imports
 import os, sys, shutil, re
 import requests
+import os, sys, shutil
+from datetime import timedelta, datetime
+import requests
+import re
 
 
 def make_dir(dirname, clean=False):
@@ -21,7 +24,6 @@ def make_dir(dirname, clean=False):
             os.mkdir(dirname)
         except OSError:
             pass # assume OSError was raised because directory already exists
-
 
 def get_data(url):
     '''Function to grab all data from specified THREDDS server'''
