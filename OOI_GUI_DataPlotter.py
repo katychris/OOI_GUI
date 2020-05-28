@@ -1,8 +1,8 @@
 """
 This code plots a measured CTD parameter (T, S, P, rho) in depth v time space.
 Meant to be run immediately after 'OOI_GUI_DataLoader.py' script
-Dependencies: sys, os, numpy, pandas, matplotlib.pyplot
-TLW - 5/26/2020
+Dependencies: sys, os, numpy, pandas, matplotlib.pyplot, cmocean
+TLW - 5/28/2020
 """
 
 # Imports
@@ -10,6 +10,7 @@ import sys, os
 import numpy as np
 import pandas as pd
 from datetime import datetime, date
+import cmocean
 
 # atuo-sense what machine you're working on and make suitable plotting choices
 # i.e. what kind of matplotlib import if on remote machine or not
@@ -44,9 +45,9 @@ rho = df['density']
 plt.close('all')
 f = plt.figure()
 f, (ax1, ax2, ax3) = plt.subplots(1,3)
-cm_temp = 'coolwarm'  # assign a colormap to temperature, could use 'thermal' instead
-cm_ps = 'YiGnBu'  # assign a colormap to practical salinity
-cm_rho = 'cividis'  # assign a colormap to density
+cm_temp = cmocean.cm.thermal  # assign a colormap to temperature
+cm_ps = cmocean.cm.haline  # assign a colormap to practical salinity
+cm_rho = cmocean.cm.dense  # assign a colormap to density
 t_utc = 'Time (UTC)'  #assign variable to time label
 
 # plot temperature as a function of pressure and time
