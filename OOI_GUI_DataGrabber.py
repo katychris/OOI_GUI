@@ -28,6 +28,9 @@ if len(API_USERNAME)==0 or len(API_TOKEN)==0:
 class TimeError(Exception):
 	pass
 
+# Use argparse for this?
+f_update=False
+
 # get the current working directory then only keep name up 2 levels
 # this will be used as the root for /code, /ooi_data, /ooi_output:
 dir_path = os.getcwd()
@@ -37,9 +40,14 @@ del a[-2:]# remove last two directories
 dir_path = '/'.join(a)
 
 # make an input data directory:
+in_dir = dir_path+'/'+dir_name+'_data/ooi_data'
+ooi_mod.make_dir(in_dir)
+
+# make an output data directory:
 out_dir = dir_path+'/'+dir_name+'_output/ooi_output'
 ooi_mod.make_dir(out_dir)
 
+# Get the station information loaded here
 st_df = pd.read_pickle('./Station_Info.pkl')
 
 
@@ -68,7 +76,7 @@ st_df = pd.read_pickle('./Station_Info.pkl')
 # Put Map here!
 
 
-# User Selections 
+# User Selections - Stations and time range
 #---------------------------------------------------------------------------------------------------
 # Print out the numbered stations
 st_sel = st_df.index
@@ -134,12 +142,12 @@ elif ini == len(opts):
 	if len(st_time)< 10 or len(ed_time)< 10:
 		raise TimeError('No time selected. Please try again!')
 	if len(st_time)==10:
-		start_time = datetime.strptime(st_time[0:10].strip(),'%Y-%m-%d')
+		start_time = np.max([datetime.strptime(st_time[0:10].strip(),'%Y-%m-%d'),station_start_time])
 	elif len(st_time) == 19:
 		start_time = datetime.strptime(st_time.strip(),'%Y-%m-%d %H:%M:%S')
 
 	if len(ed_time)==10:
-		end_time = datetime.strptime(ed_time[0:10].strip(),'%Y-%m-%d')
+		end_time = np.min([datetime.strptime(ed_time[0:10].strip(),'%Y-%m-%d'),station_end_time])
 	elif len(ed_time) == 19:
 		end_time = datetime.strptime(ed_time.strip(),'%Y-%m-%d %H:%M:%S')
 
@@ -158,123 +166,133 @@ elif ini == len(opts):
 start_time = start_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
 end_time = end_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
-# Set up the parameters used in the data grab
-params = {'beginDT':start_time,'endDT':end_time,
-  'format':'application/netcdf','include_provenance':'true','include_annotations':'true'}
+fname = in_dir+'/'+Station+'_'+'_'.join([start_time,end_time])+'.nc'
 
-# Create the request URL
-api_base_url = 'https://ooinet.oceanobservatories.org/api/m2m/12576/sensor/inv'
-data_request_url ='/'.join((api_base_url,site,node,instrument,method,stream))
-
-# Get the THREDDS server link either from our pre-made file or from the API request
-url = []
-fdep = False
-# Find if our THREDDS file exists already
-if os.path.isfile(out_dir+'/THREDDS_Servers.txt'):
-	# Open the file and go through each line
-	with open(out_dir+'/THREDDS_Servers.txt','r') as f:
-		loads = f.readlines()
-	del_line = ''
-	for l in range(0,len(loads)):
-		l_list = loads[l].split(',')
-		# If the station, the start time, and end time are the same as user input
-		# Also, if it has been genereated within the past 2 weeks
-		# Use the url we already created, saved in the file
-		if (site==l_list[1]) and (start_time==l_list[2]) and (end_time==l_list[3]):
-			if (datetime.now()<datetime.strptime(l_list[4][:-1],'%Y-%m-%dT%H:%M:%S.000Z')+timedelta(days=14)):
-				url = l_list[0]
-				fdep = True
-				print('\nTHREDDS Server URL:',url)
-
-			# Remove the line if the link has been active for longer than 2 weeks
-			else:
-				del_line = loads[l]
-	with open(out_dir+'/THREDDS_Servers.txt', 'w') as f:
-		for line in loads:
-			if line != del_line:
-				f.write(line)
-
-# If the file does not exist or the url is still unfilled, get the THREDDS server
-if not os.path.isfile(out_dir+'/THREDDS_Servers.txt') or (len(url)==0):
-	# if not in file
-	r = requests.get(data_request_url, params=params, auth=(API_USERNAME, API_TOKEN))
-	data = r.json()
+if os.path.isfile(fname) and not f_update:
+	print('\nDone!')
+	ds = nc.Dataset(fname)
 	
-	if 'message' in data:
-		if 'code' in data['message'] and data['message']['code']==404:
-			print('Uh oh! No data available for this time period. Please try again!\n')
-			sys.exit()
-		elif 'Authentication failed' in data['message']:
-			print('Authentication failed: Please check your login credentials for typos.')
-			sys.exit()
 
-	url = data['allURLs'][0]
+else:
+	# Set up the parameters used in the data grab
+	params = {'beginDT':start_time,'endDT':end_time,
+	  'format':'application/netcdf','include_provenance':'true','include_annotations':'false'}
 
-	with open(out_dir+'/THREDDS_Servers.txt',"a+") as f:
-		f.write(','.join([url,site,start_time,end_time, datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000Z')])+'\n')
-	print('\nTHREDDS Server URL:',url)
+	# Create the request URL
+	api_base_url = 'https://ooinet.oceanobservatories.org/api/m2m/12576/sensor/inv'
+	data_request_url ='/'.join((api_base_url,site,node,instrument,method,stream))
 
-# Get the datasets
-# We have to wait for the data to appear on the server, try every 15 seconds until it is there
-# Timeout after 8 minutes 
-print('\nWaiting for data...')
-selected_datasets = ooi_mod.get_data(url)
-tic = time.time()
-while len(selected_datasets) == 0:
-    time.sleep(15)
-    print('Waiting...')
-    selected_datasets = ooi_mod.get_data(url)
-    toc = time.time() - tic
-    if int(my_choice) < 4 and toc > 480:
-    	print('Something is wrong... Exiting now.')
-    	sys.exit()
-if not fdep:
-	if time_diff.days<730 or 'Deep' in Station:
-		print('Initializing Dataset...')
-		time.sleep(60)
-		selected_datasets = ooi_mod.get_data(url)
-	elif time_diff.days>730 and ('Shallow' in Station):
+	# Get the THREDDS server link either from our pre-made file or from the API request
+	url = []
+	fdep = False
+
+	# Find if our THREDDS file exists already
+	if os.path.isfile(out_dir+'/THREDDS_Servers.txt'):
+		# Open the file and go through each line
+		with open(out_dir+'/THREDDS_Servers.txt','r') as f:
+			loads = f.readlines()
+		del_line = ''
+		for l in range(0,len(loads)):
+			l_list = loads[l].split(',')
+			# If the station, the start time, and end time are the same as user input
+			# Also, if it has been genereated within the past 2 weeks
+			# Use the url we already created, saved in the file
+			if (site==l_list[1]) and (start_time==l_list[2]) and (end_time==l_list[3]):
+				if (datetime.now()<datetime.strptime(l_list[4][:-1],'%Y-%m-%dT%H:%M:%S.000Z')+timedelta(days=14)):
+					url = l_list[0]
+					fdep = True
+					print('\nTHREDDS Server URL:',url)
+				# Remove the line if the link has been active for longer than 2 weeks
+				else:
+					del_line = loads[l]
+		with open(out_dir+'/THREDDS_Servers.txt', 'w') as f:
+			for line in loads:
+				if line != del_line:
+					f.write(line)
+
+	# If the file does not exist or the url is still unfilled, get the THREDDS server
+	if not os.path.isfile(out_dir+'/THREDDS_Servers.txt') or not fdep:
+		# if not in file
+		r = requests.get(data_request_url, params=params, auth=(API_USERNAME, API_TOKEN))
+		data = r.json()
+		if 'message' in data:
+			if 'code' in data['message'] and data['message']['code']==404:
+				print('Uh oh! No data available for this time period. Please try again!\n')
+				sys.exit()
+			elif 'Authentication failed' in data['message']:
+				print('Authentication failed: Please check your login credentials for typos.')
+				sys.exit()
+		url = data['allURLs'][0]
+		with open(out_dir+'/THREDDS_Servers.txt',"a+") as f:
+			f.write(','.join([url,site,start_time,end_time, datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000Z')])+'\n')
+			print('\nTHREDDS Server URL:',url)
+	# Get the datasets
+	# We have to wait for the data to appear on the server, try every 15 seconds until it is there
+	# Timeout after 8 minutes 
+	print('\nWaiting for data...')
+	selected_datasets = ooi_mod.get_data(url)
+	tic = time.time()
+	while len(selected_datasets) == 0:
+		time.sleep(15)
 		print('Waiting...')
-		time.sleep(30)
-		print('Initializing full dataset for shallow station (15 minutes)...')
-		time.sleep(900)
 		selected_datasets = ooi_mod.get_data(url)
-print('Data is loaded!')
-print('\nExtracting and Saving...')
-    
-# We should now be able to get all of the data into a structure using netCDF4
-# if len(selected_datasets) == 1:
-if 'Shallow' in Station:
-	ds = xr.open_mfdataset(selected_datasets,combine='nested',concat_dim='obs',drop_variables=
-		['corrected_dissolved_oxygen','density_qc_executed','driver_timestamp',
-		'seawater_pressure_qc_results','practical_salinity_qc_results','provenance',
-		'corrected_dissolved_oxygen_qc_executed','corrected_dissolved_oxygen_qc_results',
-		'seawater_temperature_qc_results','internal_timestamp','seawater_conductivity_qc_results', 
-		'ext_volt0','ingestion_timestamp','port_timestamp','seawater_pressure_qc_executed',
-		'deployment','preferred_timestamp','practical_salinity_qc_executed','seawater_temperature_qc_executed', 
-		'density_qc_results', 'seawater_conductivity_qc_executed','pressure_temp','temperature','pressure',
-		'seawater_conductivity','conductivity','id'])
-	ds = ds.reset_coords(['seawater_pressure','lon','lat','time'])
-elif 'Deep' in Station:
-	ds = xr.open_mfdataset(selected_datasets,combine='nested',concat_dim='obs',drop_variables=
-		['dpc_ctd_seawater_conductivity','conductivity_millisiemens','density_qc_executed',
-		'driver_timestamp','id','practical_salinity_qc_results','provenance','internal_timestamp',
-		'raw_time_microseconds','ingestion_timestamp','conductivity_millisiemens_qc_executed',
-		'port_timestamp','raw_time_seconds','deployment','pressure_qc_results','pressure_qc_executed',
-		'preferred_timestamp','temp_qc_executed','dpc_ctd_seawater_conductivity_qc_results',
-		'practical_salinity_qc_executed','temp_qc_results','conductivity_millisiemens_qc_results',
-		'density_qc_results','dpc_ctd_seawater_conductivity_qc_executed'])
+		toc = time.time() - tic
+		if int(my_choice) < 4 and toc > 480:
+			print('Something is wrong... Exiting now.')
+			sys.exit()
+	if not fdep:
+		if time_diff.days<730 or 'Deep' in Station:
+			print('Initializing Dataset...')
+			time.sleep(60)
+			selected_datasets = ooi_mod.get_data(url)
+		elif time_diff.days>730 and ('Shallow' in Station):
+			print('Waiting...')
+			time.sleep(30)
+			print('Initializing full dataset for shallow station (15 minutes)...')
+			time.sleep(900)
+			selected_datasets = ooi_mod.get_data(url)
+	print('Data is loaded!')
+	print('\nExtracting and Saving...')	
+	# We should now be able to get all of the data into a structure using netCDF4
+	# if len(selected_datasets) == 1:
+	if 'Shallow' in Station:
+		ds1 = xr.open_mfdataset(selected_datasets,combine='nested',concat_dim='obs',drop_variables=
+			['corrected_dissolved_oxygen','density_qc_executed','driver_timestamp',
+			'seawater_pressure_qc_results','practical_salinity_qc_results','provenance',
+			'corrected_dissolved_oxygen_qc_executed','corrected_dissolved_oxygen_qc_results',
+			'seawater_temperature_qc_results','internal_timestamp','seawater_conductivity_qc_results', 
+			'ext_volt0','ingestion_timestamp','port_timestamp','seawater_pressure_qc_executed',
+			'deployment','preferred_timestamp','practical_salinity_qc_executed','seawater_temperature_qc_executed', 
+			'density_qc_results', 'seawater_conductivity_qc_executed','pressure_temp','temperature','pressure',
+			'seawater_conductivity','conductivity','id'])
+		ds1 = ds1.reset_coords(['seawater_pressure','lon','lat','time'])
+		ds1 = ds1.rename({'seawater_pressure':'pressure','seawater_temperature':'temp'})
+	elif 'Deep' in Station:
+		ds1 = xr.open_mfdataset(selected_datasets,combine='nested',concat_dim='obs',drop_variables=
+			['dpc_ctd_seawater_conductivity','conductivity_millisiemens','density_qc_executed',
+			'driver_timestamp','id','practical_salinity_qc_results','provenance','internal_timestamp',
+			'raw_time_microseconds','ingestion_timestamp','conductivity_millisiemens_qc_executed',
+			'port_timestamp','raw_time_seconds','deployment','pressure_qc_results','pressure_qc_executed',
+			'preferred_timestamp','temp_qc_executed','dpc_ctd_seawater_conductivity_qc_results',
+			'practical_salinity_qc_executed','temp_qc_results','conductivity_millisiemens_qc_results',
+			'density_qc_results','dpc_ctd_seawater_conductivity_qc_executed'])
 
-print('Done!')
+	del ds1.attrs['_NCProperties']
+	ds1.to_netcdf(fname, mode='w')
+	print('Done!')
+
+	ds = nc.Dataset(fname)
+
+
 
 # Manipulating data
 #---------------------------------------------------------------------------------------------------
 
-# # relevant fields from netcdf file
-# flds = ['time','seawater_pressure','practical_salinity','seawater_temperature','density']
-# units = []
-# for jj in range (0,len(flds)):
-#     units.append(ds[flds[jj]].units)
+# relevant fields from netcdf file
+flds = ['time','pressure','practical_salinity','temp','density']
+units = ['time']
+for jj in range (1,len(flds)):
+    units.append(ds[flds[jj]].units)
 
 # # fix the time stamp:
 # t_ooi = ds[flds[0]][:] # pull out the time from the netcdf
@@ -310,7 +328,7 @@ print('Done!')
 # pickle.dump(units, open('meta_'+save_name, 'wb')) # 'wb' is for write binary
 
 
-# Plotting!
+# Plotting initial!
 # plt.close('all')
 
 # fig = plt.figure() 
