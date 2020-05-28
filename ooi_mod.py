@@ -88,3 +88,10 @@ def ooi_to_datetime(datenum,t0):
     
     return DD + HH + MM + SS + FF
 
+
+def boolean_string(s):
+    # this function helps with getting Boolean input
+    if s not in ['False', 'True']:
+        raise ValueError('Not a valid boolean string')
+    return s == 'True' # note use of ==
+
