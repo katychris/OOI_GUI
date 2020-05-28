@@ -1,21 +1,29 @@
+# imports
 import os,sys,re
 import numpy as np
 import netCDF4 as nc
+import xarray as xr
 import pandas as pd
-import requests
+import requests, argparse
 import time
 from datetime import datetime,timedelta, date
 import matplotlib.pyplot as plt
-import xarray as xr
-import ooi_mod # module with the directory creation function
+import ooi_mod # our very own module!
 
-# # Please insert your API Username and Token here
-# print('An account with for OOI data portal is required to access this data. '+
-# 	'To create an account, visit: https://ooinet.oceanobservatories.org/ ')
-# API_USERNAME = input('API Username: ')
-# API_TOKEN = input('API Token: ')
-API_USERNAME = 'OOIAPI-YMXPV7NOB6V80B'
-API_TOKEN = 'C5UE5NIZ8UK'
+# Create an arparse argument
+# If f_update is turned on (True) the fil will reload 
+#regardless of if it is already a file that exists
+# This is useful if there is a timeout or error while loading
+parser = argparse.ArgumentParser()
+parser.add_argument('-f', '--file_update', default=False, type=ooi_mod.boolean_string)
+args = parser.parse_args()
+f_update=args.file_update
+
+# Please insert your API Username and Token here
+print('An account with for OOI data portal is required to access this data. '+
+	'To create an account, visit: https://ooinet.oceanobservatories.org/ ')
+API_USERNAME = input('API Username: ')
+API_TOKEN = input('API Token: ')
 
 # Create an error if there is no username or token
 class LoginError(Exception):
@@ -27,9 +35,6 @@ if len(API_USERNAME)==0 or len(API_TOKEN)==0:
 # Create an error if the time selected by the user is not useable
 class TimeError(Exception):
 	pass
-
-# Use argparse for this?
-f_update=False
 
 # get the current working directory then only keep name up 2 levels
 # this will be used as the root for /code, /ooi_data, /ooi_output:
@@ -53,6 +58,8 @@ st_df = pd.read_pickle('./Station_Info.pkl')
 
 # Mapping
 #---------------------------------------------------------------------------------------------------
+# Write this as a function?
+
 # # Read the map data
 # # Set the maximum and minimum lats and lons
 # lat_min = 43
@@ -78,7 +85,7 @@ st_df = pd.read_pickle('./Station_Info.pkl')
 
 # User Selections - Stations and time range
 #---------------------------------------------------------------------------------------------------
-# Print out the numbered stations
+# Print out the stations numbered for user selection
 st_sel = st_df.index
 my_choice1 = ooi_mod.list_picker('Station Selection',st_sel)
 Station = st_sel[int(my_choice1)-1]
@@ -108,10 +115,12 @@ opts = [tos[0][0].strftime('%Y-%m-%d')+' to '+tos[0][1].strftime('%Y-%m-%d')+' (
 		tos[2][0].strftime('%Y-%m-%d')+' to '+tos[2][1].strftime('%Y-%m-%d')+' (First 6 Months)',
 		tos[3][0].strftime('%Y-%m-%d')+' to '+tos[3][1].strftime('%Y-%m-%d')+' (Entire Time Series)',
 		'Custom Date Range']
+
+# Print out the time options numbered for user selection
 my_choice = ooi_mod.list_picker('Time Selection',opts)
 ini = int(my_choice)
 
-# Go through the user's option saving the starts and ends
+# Go through the user's option saving the start and end times
 if (ini < len(opts)-1) and (ini>0):
 	start_time = tos[ini-1][0]
 	end_time = tos[ini-1][1]
@@ -135,13 +144,14 @@ elif ini == len(opts):
 	print('Input Format: YYYY-mm-dd HH:MM:SS')
 	print('Date (YYYY-mm-dd) is required; Time (HH:MM:SS) is optional, default 00:00:00')
 
+	# User input
 	st_time = input('Start Time: ')
 	ed_time = input('End Time: ')
 
-	# Make input into datetime object
+	# Make inputs into datetime objects
 	if len(st_time)< 10 or len(ed_time)< 10:
 		raise TimeError('No time selected. Please try again!')
-	if len(st_time)==10:
+	elif len(st_time)==10:
 		start_time = np.max([datetime.strptime(st_time[0:10].strip(),'%Y-%m-%d'),station_start_time])
 	elif len(st_time) == 19:
 		start_time = datetime.strptime(st_time.strip(),'%Y-%m-%d %H:%M:%S')
@@ -159,20 +169,22 @@ elif ini == len(opts):
 	print('\nTime Range: ',start_time,' to ',end_time,'\n')
 
 
-
 # Retrieving Data
 #---------------------------------------------------------------------------------------------------
 # Make the start and end times into useable strings
 start_time = start_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
 end_time = end_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
+# Create a file name where the data will be saved
 fname = in_dir+'/'+Station+'_'+'_'.join([start_time,end_time])+'.nc'
 
+# If this file already exists (and the user does not want to update), pull from there!
 if os.path.isfile(fname) and not f_update:
+	print(fname)
 	print('\nDone!')
 	ds = nc.Dataset(fname)
 	
-
+# Otherwise pull from the THREDDS server
 else:
 	# Set up the parameters used in the data grab
 	params = {'beginDT':start_time,'endDT':end_time,
@@ -182,10 +194,11 @@ else:
 	api_base_url = 'https://ooinet.oceanobservatories.org/api/m2m/12576/sensor/inv'
 	data_request_url ='/'.join((api_base_url,site,node,instrument,method,stream))
 
-	# Get the THREDDS server link either from our pre-made file or from the API request
+	# Set up changeable variables
 	url = []
 	fdep = False
 
+	# Get the THREDDS server link either from our pre-made file or from the API request
 	# Find if our THREDDS file exists already
 	if os.path.isfile(out_dir+'/THREDDS_Servers.txt'):
 		# Open the file and go through each line
@@ -205,30 +218,34 @@ else:
 				# Remove the line if the link has been active for longer than 2 weeks
 				else:
 					del_line = loads[l]
+		# Resave the file without the old links
 		with open(out_dir+'/THREDDS_Servers.txt', 'w') as f:
 			for line in loads:
 				if line != del_line:
 					f.write(line)
 
-	# If the file does not exist or the url is still unfilled, get the THREDDS server
+	# If the file does not exist or the url is still unfilled, get the THREDDS server using API
 	if not os.path.isfile(out_dir+'/THREDDS_Servers.txt') or not fdep:
-		# if not in file
 		r = requests.get(data_request_url, params=params, auth=(API_USERNAME, API_TOKEN))
 		data = r.json()
+		# If there is a message, something has gone wrong
 		if 'message' in data:
+			# Error code 404 means that there is no data for the selected time range
 			if 'code' in data['message'] and data['message']['code']==404:
 				print('Uh oh! No data available for this time period. Please try again!\n')
 				sys.exit()
+			# Authentication failure means they typed in passcode wrong
 			elif 'Authentication failed' in data['message']:
 				print('Authentication failed: Please check your login credentials for typos.')
 				sys.exit()
+		# Get the THREDDS link
 		url = data['allURLs'][0]
 		with open(out_dir+'/THREDDS_Servers.txt',"a+") as f:
 			f.write(','.join([url,site,start_time,end_time, datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000Z')])+'\n')
 			print('\nTHREDDS Server URL:',url)
 	# Get the datasets
 	# We have to wait for the data to appear on the server, try every 15 seconds until it is there
-	# Timeout after 8 minutes 
+	# Timeout after 10 minutes if they picked one of the premade options (not ful time-series)
 	print('\nWaiting for data...')
 	selected_datasets = ooi_mod.get_data(url)
 	tic = time.time()
@@ -236,26 +253,37 @@ else:
 		time.sleep(15)
 		print('Waiting...')
 		selected_datasets = ooi_mod.get_data(url)
+		# Save the amount of time that has passed
 		toc = time.time() - tic
-		if int(my_choice) < 4 and toc > 480:
+		if int(my_choice) < len(opts)-1 and toc > 600:
+			# This is out timeout error
 			print('Something is wrong... Exiting now.')
 			sys.exit()
+
 	if not fdep:
-		if time_diff.days<730 or 'Deep' in Station:
+		# If the time series is relatively short (or if there isn't much data - Deep)
+		# We wait 60 extra seconds to let the data all settle in the server
+		if time_diff.days<=1000 or 'Deep' in Station:
 			print('Initializing Dataset...')
-			time.sleep(60)
+			time.sleep(90)
 			selected_datasets = ooi_mod.get_data(url)
-		elif time_diff.days>730 and ('Shallow' in Station):
+		# If the time series is long (>1000 days) for a shallow station
+		# We wait 15 minutes for the data to settle in the server
+		elif time_diff.days>1000 and ('Shallow' in Station):
 			print('Waiting...')
 			time.sleep(30)
-			print('Initializing full dataset for shallow station (15 minutes)...')
+			print('Initializing dataset for shallow station (15 minutes)...')
 			time.sleep(900)
 			selected_datasets = ooi_mod.get_data(url)
+
+	# Print statements!
 	print('Data is loaded!')
 	print('\nExtracting and Saving...')	
+
 	# We should now be able to get all of the data into a structure using netCDF4
 	# if len(selected_datasets) == 1:
 	if 'Shallow' in Station:
+		# Open the dataset and ignore the variables we don't need (there are a lot!)
 		ds1 = xr.open_mfdataset(selected_datasets,combine='nested',concat_dim='obs',drop_variables=
 			['corrected_dissolved_oxygen','density_qc_executed','driver_timestamp',
 			'seawater_pressure_qc_results','practical_salinity_qc_results','provenance',
@@ -265,9 +293,12 @@ else:
 			'deployment','preferred_timestamp','practical_salinity_qc_executed','seawater_temperature_qc_executed', 
 			'density_qc_results', 'seawater_conductivity_qc_executed','pressure_temp','temperature','pressure',
 			'seawater_conductivity','conductivity','id'])
+
+		# Reformat the coordinates and rename the variables so it matches the deep stations
 		ds1 = ds1.reset_coords(['seawater_pressure','lon','lat','time'])
 		ds1 = ds1.rename({'seawater_pressure':'pressure','seawater_temperature':'temp'})
 	elif 'Deep' in Station:
+		# Open the dataset and ignore the variables we don't need (there are a lot!)
 		ds1 = xr.open_mfdataset(selected_datasets,combine='nested',concat_dim='obs',drop_variables=
 			['dpc_ctd_seawater_conductivity','conductivity_millisiemens','density_qc_executed',
 			'driver_timestamp','id','practical_salinity_qc_results','provenance','internal_timestamp',
@@ -277,12 +308,16 @@ else:
 			'practical_salinity_qc_executed','temp_qc_results','conductivity_millisiemens_qc_results',
 			'density_qc_results','dpc_ctd_seawater_conductivity_qc_executed'])
 
-	del ds1.attrs['_NCProperties']
+	# Save the file
+	del ds1.attrs['_NCProperties'] # This is to deal with a bug with xarray
+	if fdep:
+		os.remove(fname)
 	ds1.to_netcdf(fname, mode='w')
+	print(fname)
 	print('Done!')
 
+	# Open the file that we just saved
 	ds = nc.Dataset(fname)
-
 
 
 # Manipulating data
@@ -329,6 +364,8 @@ for jj in range (1,len(flds)):
 
 
 # Plotting initial!
+#---------------------------------------------------------------------------------------------------
+
 # plt.close('all')
 
 # fig = plt.figure() 
