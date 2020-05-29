@@ -1,8 +1,8 @@
 """
 This code plots a measured CTD parameter (T, S, P, rho) in depth v time space.
 Meant to be run immediately after 'OOI_GUI_DataLoader.py' script
-Dependencies: sys, os, numpy, pandas, matplotlib.pyplot
-TLW - 5/28/2020
+Dependencies: sys, os, numpy, pandas, matplotlib.pyplot, cmocean
+TLW - 5/29/2020
 """
 
 # Imports
@@ -10,6 +10,7 @@ import sys, os
 import numpy as np
 import pandas as pd
 from datetime import datetime, date
+import cmocean
 
 # atuo-sense what machine you're working on and make suitable plotting choices
 # i.e. what kind of matplotlib import if on remote machine or not
@@ -29,12 +30,17 @@ else:
 import matplotlib.pyplot as plt
 
 
+# ONLY FOR TESTING  -- read in test pickle file
+#data_dir = '/Users/theresawhorley/effcomp/OOI_GUI_data/'
+#fname = data_dir + 'testfortheresa.p'
+#df = pd.read_pickle(fname)
+
 # read in pickle file
 df.read_pickle(save_name)
 
 # make a figure object with axes of pressure v time
 # time is stored as index of DataFrame df
-x = df['time']
+x = df.index
 y = df['pressure']
 temp = df['temp']
 ps = df['practical_salinity']
@@ -42,37 +48,44 @@ rho = df['density']
 
 # make figure with three subplots for three variables
 plt.close('all')
-f = plt.figure()
-f, (ax1, ax2, ax3) = plt.subplots(1,3)
-cm_temp = 'coolwarm'  # assign a colormap to temperature
-cm_ps = 'YiGnBu'  # assign a colormap to practical salinity
-cm_rho = 'cividis'  # assign a colormap to density
+fig, (ax1, ax2, ax3) = plt.subplots(1,3, sharey=True)
+cm_temp = cmocean.cm.tempo  # assign a colormap to temperature
+cm_ps = cmocean.cm.haline  # assign a colormap to practical salinity
+cm_rho = cmocean.cm.dense  # assign a colormap to density
 t_utc = 'Time (UTC)'  #assign variable to time label
 
 # plot temperature as a function of pressure and time
-ax1.scatter(x, y,linewidth=3, label='Temperature', edgecolor='k', c=temp, cmap=cm_temp)
+sc1 = ax1.scatter(x, y, c=temp, vmin=0, vmax=35, cmap=cm_temp)
+ax1.tick_params(axis='x', direction='in', labelrotation=70)
+ax1.tick_params(axis='y', direction='in')
 ax1.invert_yaxis()
-ax1.legend(loc='lower left')
-ax1.set_title('Tempterature by depth, time')
+ax1.set_title('Tempterature (C)')
 ax1.set_xlabel(t_utc)
 ax1.set_ylabel('Pressure (dbar)')
+cbar1 = fig.colorbar(sc1, ax=ax1)
 
 # plot practical salinity as a function of pressure and time
-ax2.scatter(x, y, linewidth=3, label='Practical Salinity', edgecolor='k', c=ps, cmap=cm_ps)
-ax2.legend(loc='lower left')
-ax2.set_title('Salinity by depth, time')
+sc2 = ax2.scatter(x, y, c=ps, vmin=30, vmax=35, cmap=cm_ps)
+ax2.tick_params(axis='x', direction='in', labelrotation=70)
+ax2.tick_params(axis='y', direction='in')
+ax2.invert_yaxis()
+ax2.set_title('Salinity (PSU)')
 ax2.set_xlabel(t_utc)
-ax2.set_ylabel('Practical Salinity (PSU)')
+cbar2 = fig.colorbar(sc2, ax=ax2)
 
 # plot density as a function of pressure and time
-ax3.scatter(x, y, linewidth=3, label='Density', edgecolor=='k', c=rho, cmap=cm_rho)
+sc3 = ax3.scatter(x, y, c=rho, vmin=1024, vmax=1030, cmap=cm_rho)
+ax3.tick_params(axis='x', direction='in', labelrotation=70)
+ax3.tick_params(axis='y', direction='in')
 ax3.invert_yaxis()
-ax3.legend(loc='lower left')
-ax3.set_title('Density by depth, time')
+ax3.set_title('$Density (kg/m^{3})$')
 ax3.set_xlabel(t_utc)
-ax3.set_ylabel('$Density (kg/m^{3}$')  #note to self: double-check this later
+cbar3 = fig.colorbar(sc3, ax=ax3, use_gridspec=True)
 
 # save and show figures
-fig_title = plt.plot('')
-fig_name = out_dir + fig_title + '.png'
+fig_title = fig.suptitle('test01')  # work on how to make this a text string of Station and Node from DataGrabber.py inputs
+#fig_name = out_dir + fig_title + '.png'
+fig_name = 'test01.png'
+plt.tight_layout()
 plt.savefig(out_dir)
+plt.show()
