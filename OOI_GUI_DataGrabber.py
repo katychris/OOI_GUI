@@ -40,16 +40,16 @@ class TimeError(Exception):
 # this will be used as the root for /code, /ooi_data, /ooi_output:
 dir_path = os.getcwd()
 a = dir_path.split('/') # makes a list out of the path name
-dir_name = a[-2]
-del a[-2:]# remove last two directories
+dir_name = a[-1]
+del a[-1:]# remove last two directories
 dir_path = '/'.join(a)
 
 # make an input data directory:
-in_dir = dir_path+'/'+dir_name+'_data/ooi_data'
+in_dir = dir_path+'/'+dir_name+'_data/'
 ooi_mod.make_dir(in_dir)
 
 # make an output data directory:
-out_dir = dir_path+'/'+dir_name+'_output/ooi_output'
+out_dir = dir_path+'/'+dir_name+'_output/'
 ooi_mod.make_dir(out_dir)
 
 # Get the station information loaded here
@@ -313,59 +313,62 @@ else:
 	del ds1.attrs['_NCProperties'] # This is to deal with a bug with xarray
 	if fdep:
 		os.remove(fname)
-	ds1.to_netcdf(fname, mode='w')
+	ds1.to_netcdf(fname, mode='w',format='netCDF4')
+	
+	ds = nc.Dataset(fname)
 	print(fname)
 	print('Done!')
 
 	# Open the file that we just saved
-	ds = nc.Dataset(fname)
-
-
+	
 
 # Manipulating data
 #---------------------------------------------------------------------------------------------------
-
+print('\nConverting netCDF to pandas dataframe...')
 # relevant fields from netcdf file
 flds = ['time','pressure','practical_salinity','temp','density']
-units = ['time']
-for jj in range (1,len(flds)):
+units = []
+fillval = []
+for jj in range (0,len(flds)):
     units.append(ds[flds[jj]].units)
+    fillval.append(ds[flds[jj]]._FillValue)
 
-# # fix the time stamp:
-# t_ooi = ds[flds[0]][:] # pull out the time from the netcdf
-# if '1900' in units[0]: # there are two options for the reference year for the OOI time: 1900,1970
-#     t0=datetime.toordinal(date(1900,1,1))
-# elif '1970' in units[0]:
-#     t0=datetime.toordinal(date(1970,1,1))
+print('Fixing timestamp...')
+# fix the time stamp:
+t_ooi = ds[flds[0]][:] # pull out the time from the netcdf
+t_ooi[t_ooi==fillval[0]]=np.nan # nan any bad vals
+if '1900' in units[0]: # there are two options for the reference year for the OOI time: 1900,1970
+    t0=datetime.toordinal(date(1900,1,1))
+elif '1970' in units[0]:
+    t0=datetime.toordinal(date(1970,1,1))
 
-# # use this function to convert to a python datetime
-# tt =[]
-# for jj in range(0,len(t_ooi)):
-#     tt.append(ooi_mod.ooi_to_datetime(t_ooi[jj],t0))
+# use this function to convert to a python datetime
+tt =[]
+for jj in range(0,len(t_ooi)):
+    tt.append(ooi_mod.ooi_to_datetime(t_ooi[jj],t0))
 
+# put the data into a pandas data frame for convenient storage
+df = pd.DataFrame(data=tt,columns=[flds[0]])
+for jj in range (1,len(flds)):
+    temp = ds[flds[jj]][:] #pull out data
+    temp[temp==fillval[jj]]=np.nan # nan any bad vals
+    df.insert(jj,flds[jj],ds[flds[jj]][:])
 
-# # put the data into a pandas data frame for convenient storage
-# df = pd.DataFrame(data=tt,columns=[flds[0]])
-# for jj in range (1,len(flds)):
-#      df.insert(jj,flds[jj],ds[flds[jj]][:])
+# set the time (first col) as index:
+df.set_index('time',inplace=True)
 
-# # set the time (first col) as index:
-# df.set_index('time',inplace=True)
-
-# # replace fill values with nans:
-# df[df==-9999999.0]=np.nan
-
-# # get a name for the output pickle file:
-# fname = selected_datasets[0]
-# fname = fname.split('.') # makes a list out of the path name
-# save_name = out_dir + fname[0] + '.p'
-# # save the dataframe as a pickle file
-# df.to_pickle(save_name)
-# # save the metadata as a pickle file:
+# switch the .nc name to a pickle name and save in the output directory:
+fname1=fname.replace('nc','p')
+# save the dataframe as a pickle file
+df.to_pickle(fname1)
+print('\nSaving pickle file of pandas dataframe!')
+print('Done!')
+# save the metadata as a pickle file:
 # pickle.dump(units, open('meta_'+save_name, 'wb')) # 'wb' is for write binary
 
 
 # Plotting initial!
+#---------------------------------------------------------------------------------------------------
 # plt.close('all')
 
 # fig = plt.figure() 
