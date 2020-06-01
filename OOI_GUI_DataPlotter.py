@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, date
 import cmocean
+import ooi_mod
 
 # atuo-sense what machine you're working on and make suitable plotting choices
 # i.e. what kind of matplotlib import if on remote machine or not
@@ -43,7 +44,7 @@ ooi_mod.make_dir(out_dir)
 
 # read in pickle file
 fname1 = input("Station File Name")
-df.read_pickle(fname1)
+df = pd.read_pickle(fname1)
 
 # make a figure object with axes of pressure v time
 # time is stored as index of DataFrame df
