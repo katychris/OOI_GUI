@@ -62,7 +62,7 @@ cm_rho = cmocean.cm.dense  # assign a colormap to density
 t_utc = 'Time (UTC)'  #assign variable to time label
 
 # plot temperature as a function of pressure and time
-sc1 = ax1.scatter(x, y, c=temp, vmin=0, vmax=20, cmap=cm_temp)
+sc1 = ax1.scatter(x, y, c=temp, vmin=np.nanmin(temp), vmax=np.nanmax(temp), cmap=cm_temp)
 ax1.tick_params(axis='x', direction='in', labelrotation=70)
 ax1.tick_params(axis='y', direction='in')
 ax1.invert_yaxis()
@@ -72,7 +72,7 @@ ax1.set_ylabel('Pressure (dbar)')
 cbar1 = fig.colorbar(sc1, ax=ax1)
 
 # plot practical salinity as a function of pressure and time
-sc2 = ax2.scatter(x, y, c=ps, vmin=30, vmax=35, cmap=cm_ps)
+sc2 = ax2.scatter(x, y, c=ps, vmin=np.nanmin(ps), vmax=np.nanmax(ps), cmap=cm_ps)
 ax2.tick_params(axis='x', direction='in', labelrotation=70)
 ax2.tick_params(axis='y', direction='in')
 ax2.invert_yaxis()
@@ -81,7 +81,7 @@ ax2.set_xlabel(t_utc)
 cbar2 = fig.colorbar(sc2, ax=ax2)
 
 # plot density as a function of pressure and time
-sc3 = ax3.scatter(x, y, c=rho, vmin=1022.0, vmax=1042.0, cmap=cm_rho)
+sc3 = ax3.scatter(x, y, c=rho, vmin=np.nanmin(rho), vmax=np.nanmax(rho), cmap=cm_rho)
 ax3.tick_params(axis='x', direction='in', labelrotation=70)
 ax3.tick_params(axis='y', direction='in')
 ax3.invert_yaxis()
