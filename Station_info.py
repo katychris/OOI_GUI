@@ -1,6 +1,4 @@
 import pandas as pd
-import os
-import ooi_mod
 
 # Instrument Information
 # This is all of the info for the CTDs at our stations
