@@ -7,10 +7,6 @@ import pandas as pd
 import requests, argparse
 import time
 from datetime import datetime,timedelta, date
-# import cartopy.crs as ccrs 
-# from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
-# from cartopy import config
-# import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
 # from matplotlib import colors
 # from matplotlib import cm
@@ -418,7 +414,7 @@ HEG (5/26/2020)
 """
 
 # switch the .nc name to a pickle name and save in the output directory:
-fname1=fname.replace('nc','p')
+fname1=fname.replace('.nc','.p')
 
 if os.path.isfile(fname1) and not f_update:
 	print('\nUsing saved pickle file...')
