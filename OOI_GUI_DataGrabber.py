@@ -466,7 +466,7 @@ else:
 	# set the time (first col) as index:
 	df.set_index('time',inplace=True)
 	if os.path.isfile(fname1):
-		os.remove(fname)
+		os.remove(fname1)
 	# save the dataframe as a pickle file
 	df.to_pickle(fname1)
 	print('\nSaving pickle file of pandas dataframe...')
