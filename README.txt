@@ -1,4 +1,6 @@
 This code package is for selecting and downloading OOI Cabled Array, profiling CTD data and then plotting that data.
+** User should run OOI_GUI_DataGrabber first.
+** User can optionally run OOI_GUI_DataPlotter to create nicely formatted plots of the data.
 
 ======================================================================
 * OOI_GUI_DataGrabber.py does a series of tasks to prepare data for plotting:
