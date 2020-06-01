@@ -12,6 +12,12 @@ import re
 import cmocean
 
 
+def boolean_string(s):
+    # this function helps with getting Boolean input
+    if s not in ['False', 'True']:
+        raise ValueError('Not a valid boolean string')
+    return s == 'True' # note use of ==
+
 def make_dir(dirname, clean=False):
     """
     Make a directory if it does not exist.
@@ -25,6 +31,14 @@ def make_dir(dirname, clean=False):
             os.mkdir(dirname)
         except OSError:
             pass # assume OSError was raised because directory already exists
+
+def dar(ax):
+    """
+    Fixes the plot aspect ratio to be locally Cartesian.
+    """
+    yl = ax.get_ylim()
+    yav = (yl[0] + yl[1])/2
+    ax.set_aspect(1/np.sin(np.pi*yav/180))
 
 def get_data(url):
     '''Function to grab all data from specified THREDDS server'''
@@ -67,7 +81,6 @@ def list_picker(title,data_list,default_val=1):
 
     return my_choice
 
-
 def ooi_to_datetime(datenum,t0):
     # fix the OOI time stamp and convert to python
     # inputs:
@@ -90,11 +103,3 @@ def ooi_to_datetime(datenum,t0):
     FF = timedelta(milliseconds=int(round(FF)))
     
     return Dx + HH + MM + SS + FF
-
-
-def boolean_string(s):
-    # this function helps with getting Boolean input
-    if s not in ['False', 'True']:
-        raise ValueError('Not a valid boolean string')
-    return s == 'True' # note use of ==
-
