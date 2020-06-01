@@ -44,6 +44,7 @@ API_TOKEN = input('API Token: ')
 API_USERNAME = API_USERNAME.strip()
 API_TOKEN = API_TOKEN.strip(' ')
 
+
 # Create an error if there is no username or token
 class LoginError(Exception):
 	pass
@@ -317,6 +318,7 @@ else:
 		# Reformat the coordinates and rename the variables so it matches the deep stations
 		ds1 = ds1.reset_coords(['seawater_pressure','lon','lat'])
 		ds1 = ds1.rename({'seawater_pressure':'pressure','seawater_temperature':'temp'})
+
 	elif 'Deep' in Station:
 		# Open the dataset and ignore the variables we don't need (there are a lot!)
 		ds1 = xr.open_mfdataset(selected_datasets,combine='nested',concat_dim='obs',drop_variables=
@@ -328,7 +330,8 @@ else:
 			'practical_salinity_qc_executed','temp_qc_results','conductivity_millisiemens_qc_results',
 			'density_qc_results','dpc_ctd_seawater_conductivity_qc_executed'])
 
-	# Save the file
+	# Make subsample the data into 10min chunks to cut down on data
+	# Reformat the data so that it is easier to save and reload
 	del ds1.attrs['_NCProperties'] # This is to deal with a bug with xarray
 	ds1 = ds1.swap_dims({'obs':'time'})
 	ds1 = ds1.resample(time='10Min',keep_attrs=True).mean(keep_attrs=True)
@@ -336,16 +339,17 @@ else:
 	ds1 = ds1.assign_coords({'obs':np.arange(0,len(ds1['time']))})
 	ds1 = ds1.reset_coords(['time'])
 	
+	# Save the file, removing if it already exists
 	if fdep:
 		os.remove(fname)
 	ds1.to_netcdf(fname, mode='w',format='netCDF4')
 
+	# Open the file that we just saved
 	ds = nc.Dataset(fname)
 
 	print(fname)
 	print('Done!')
-
-	# Open the file that we just saved
+	
 	
 
 # Manipulating data
@@ -381,7 +385,10 @@ else:
 	print('Fixing timestamp...')
 	# fix the time stamp:
 	t_ooi = ds[flds[0]][:] # pull out the time from the netcdf
-	t0 = datetime.toordinal(datetime.strptime(units[0].split()[-2]+' '+units[0].split()[-1], '%Y-%m-%d %H:%M:%S'))
+	t00 = datetime.strptime(units[0].split()[-2]+' '+units[0].split()[-1], '%Y-%m-%d %H:%M:%S')
+	t01 = datetime.toordinal(t00)
+	H0 = t00.hour/24; M0 = t00.minute/(24*60); S0 = t00.second/(24*3600)
+	t0 = t01+H0+M0+S0
 	# t_ooi[t_ooi==fillval[0]]=np.nan # nan any bad vals
 	# if '1900' in units[0]: # there are two options for the reference year for the OOI time: 1900,1970
 	#     t0=datetime.toordinal(date(1900,1,1))
@@ -391,7 +398,7 @@ else:
 	# use this function to convert to a python datetime
 	tt =[]
 	for jj in range(0,len(t_ooi)):
-	    tt.append(ooi_mod.ooi_to_datetime(t_ooi[jj]*3600,t0))
+	    tt.append(ooi_mod.ooi_to_datetime(t_ooi[jj]*60,t0))
 
 	# put the data into a pandas data frame for convenient storage
 	df = pd.DataFrame(data=tt,columns=[flds[0]])
