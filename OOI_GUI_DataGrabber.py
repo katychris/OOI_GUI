@@ -45,8 +45,7 @@ print('An account with for OOI data portal is required to access this data. '+
 API_USERNAME = input('API Username: ')
 API_TOKEN = input('API Token: ')
 API_USERNAME = API_USERNAME.strip()
-API_TOKEN = API_TOKEN.strip(' ')
-
+API_TOKEN = API_TOKEN.strip()
 
 # Create an error if there is no username or token
 class LoginError(Exception):
@@ -75,9 +74,38 @@ ooi_mod.make_dir(in_dir)
 out_dir = dir_path+'/'+dir_name+'_output'
 ooi_mod.make_dir(out_dir)
 
-# Get the station information loaded here
-st_df = pd.read_pickle('./Station_Info.pkl')
+# Instrument Information
+#---------------------------------------------------------------------------------------------------
+# This is all of the info for the CTDs at our stations
+# I have hard coded it here, but I am looking for a way to grab this from the web instead?
+# I might just pickle this dataframe and have it readable in the git repo
+station_info = {'Oregon_Offshore_Deep':
+                ['CE04OSPD','DP01B','01-CTDPFL105','recovered_inst','dpc_ctd_instrument_recovered',
+                '2014-08-16T23:30:00.000Z','2019-08-30T22:07:54.328Z','44.36829','-124.9528'],
+                
+                'Oregon_Offshore_Shallow':
+                ['CE04OSPS','SF01B','2A-CTDPFA107','streamed','ctdpf_sbe43_sample',
+                '2014-11-05T21:30:49.640Z','2019-11-13T19:54:41.760Z','44.37415','-124.95648'],
+                
+                'Slope_Base_Deep':
+                ['RS01SBPD','DP01A','01-CTDPFL104','recovered_inst','dpc_ctd_instrument_recovered',
+                '2015-07-22T21:19:34.153Z','2019-07-02T07:46:00.000Z','44.52757','-125.38075'],
+                
+                'Slope_Base_Shallow':
+                ['RS01SBPS','SF01A','2A-CTDPFA102','streamed','ctdpf_sbe43_sample',
+                '2014-10-06T22:05:23.269Z','2019-09-27T18:41:52.175Z','44.52897','-125.38966'],
+                
+                'Axial_Base_Deep':
+                ['RS03AXPD','DP03A','01-CTDPFL304','recovered_inst','dpc_ctd_instrument_recovered',
+                '2014-08-09T21:00:00.000Z','2020-01-17T19:32:36.920Z','45.82972','-129.75904'],
+                
+                'Axial_Base_Shallow':
+                ['RS03AXPS','SF03A','2A-CTDPFA302','streamed','ctdpf_sbe43_sample',
+                '2014-10-07T21:32:53.602Z','2020-05-09T05:15:48.072Z','45.83049','-129.75326']}
 
+st_df = pd.DataFrame.from_dict(station_info, orient='index',
+	columns=['Site','Node','Instrument','Method','Stream','Start_Date','End_Date','Lat','Lon'])
+st_df.to_pickle('./Station_Info.pkl')
 
 # Mapping
 #---------------------------------------------------------------------------------------------------
@@ -109,14 +137,9 @@ z_max = z.max()
 z_min = z.min()
 gebco.close()
 
-# plot data
-# extent = [lon_min, lon_max, lat_min, lat_max] #Set data extent
-
 print('Making a map!')
-
 plt.close('all')
 fig = plt.figure(figsize=(10, 8))  #set figure size and projection                    
-# ax = fig.add_subplot(111, projection=projection)
 ax = fig.add_subplot(111)
 
 cmap = cmocean.tools.crop(cmocean.cm.topo, vmin = z_min, vmax = z_max, pivot = 0) #Adjust color bar to show land and ocean
@@ -131,24 +154,24 @@ ax.tick_params(labelsize=fs)
 ooi_mod.dar(ax)
 
 #Load in pickle file of station locations
-st_df = pd.read_pickle('Station_Info.pkl')
+st_df = pd.read_pickle('./Station_Info.pkl')
 st_df['Station'] = st_df.index.copy()
 st_lat = st_df['Lat'].astype(float)
 st_lon = st_df['Lon'].astype(float)
 
 # add station locations and labels
 ax.plot(st_lon,st_lat , '#652666', marker = 'o', markersize=7, linewidth = 0)
-ax.text(st_lon['Oregon_Offshore_Deep'], st_lat['Oregon_Offshore_Deep']-0.3,'Oregon Offshore', weight = 'bold', horizontalalignment='right',
+ax.text(st_lon['Oregon_Offshore_Shallow'], st_lat['Oregon_Offshore_Shallow']-0.3,'Oregon Offshore', weight = 'bold', horizontalalignment='right',
     bbox=dict(facecolor='w', edgecolor='None', alpha=0.3))  
-ax.text(st_lon['Slope_Base_Deep']-0.4, st_lat['Slope_Base_Deep']+ 0.205,'Slope Base', weight = 'bold',
+ax.text(st_lon['Slope_Base_Shallow']-0.4, st_lat['Slope_Base_Shallow']+ 0.205,'Slope Base', weight = 'bold',
     bbox=dict(facecolor='w', edgecolor='None', alpha=0.3))
-ax.text(st_lon['Axial_Base_Deep'], st_lat['Axial_Base_Deep']+0.18,'Axial Base', weight = 'bold',
+ax.text(st_lon['Axial_Base_Shallow'], st_lat['Axial_Base_Shallow']+0.18,'Axial Base', weight = 'bold',
     bbox=dict(facecolor='w', edgecolor='None', alpha=0.3))
 
 # Save the plot by calling plt.savefig() BEFORE plt.show()
 fig_name = 'OOI_GUI_Bathymetry.png'
 if save_fig:
-	plt.savefig(out_dir)
+	plt.savefig(out_dir+'/'+fig_name)
 	print('Map Saved!')
 elif not save_fig:
 	plt.show()
@@ -462,6 +485,6 @@ else:
 	print('\nSaving pickle file of pandas dataframe...')
 	print('\nUse the following path as the input to OOI_GUI_DataPlotter.py:')
 	print(fname1)
-	print('\nDone!')
+	print('\nDone!\n')
 # save the metadata as a pickle file:
 # pickle.dump(units, open('meta_'+save_name, 'wb')) # 'wb' is for write binary
