@@ -132,7 +132,7 @@ ax.set_xlabel('Longitude', size=fs,fontweight='bold')
 ax.xaxis.set_label_position('top') 
 ax.set_ylabel('Latitude', size=fs,fontweight='bold')
 ax.tick_params(labelsize=fs)
-dar(ax)
+ooi_mod.dar(ax)
 
 #Load in pickle file of station locations
 st_df = pd.read_pickle('Station_Info.pkl')
