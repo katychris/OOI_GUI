@@ -284,7 +284,7 @@ if os.path.isfile(fname) and not f_update:
 else:
 	# Set up the parameters used in the data grab
 	params = {'beginDT':start_time,'endDT':end_time,
-	  'format':'application/netcdf','include_provenance':'true','include_annotations':'false'}
+	  'format':'application/netcdf','include_provenance':'true','include_annotations':'true'}
 
 	# Create the request URL
 	api_base_url = 'https://ooinet.oceanobservatories.org/api/m2m/12576/sensor/inv'
@@ -354,6 +354,19 @@ else:
 		if int(my_choice) < len(opts)-1 and toc > 600:
 			# This is out timeout error
 			print('Something is wrong... Exiting now.')
+			print('Possible malfunction with THREDDS server: try again or use browser to see if the data is available.')
+			with open(out_dir+'/THREDDS_Servers.txt','r') as f:
+				loads = f.readlines()
+			del_line = ''
+			for l in range(0,len(loads)):
+				l_list = loads[l].split(',')
+				if url==l_list[0]:
+					del_line = loads[l]
+			# Resave the file without the old links
+			with open(out_dir+'/THREDDS_Servers.txt', 'w') as f:
+				for line in loads:
+					if line != del_line:
+						f.write(line)
 			sys.exit()
 
 	if not fdep:
@@ -415,7 +428,7 @@ else:
 	ds1 = ds1.reset_coords(['time'])
 	
 	# Save the file, removing if it already exists
-	if fdep:
+	if os.path.isfile(fname):
 		os.remove(fname)
 	ds1.to_netcdf(fname, mode='w',format='netCDF4')
 
