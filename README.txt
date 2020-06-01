@@ -23,9 +23,10 @@ Written by: Katy Christensen, Hannah Glover, Susanna Michael, and Theresa Whorle
 * ooi_mod.py is a module containing the functions for OOI_GUI_DataGrabber.py 
 
 make_dir(dirname,clean=False) - creates a directory if it does not exist, use clean=True to remove and recreate the directory
-ooi_to_datetime(datenum,t0) - fix the OOI time stamp and convert to python
-boolean_string(s) - this function helps with getting Boolean input to be used with the argparse capabilities in OOI_GUI_DataGrabber.py
 get_data(url) - function to grab all data from specified THREDDS server given as a url
+ooi_to_datetime(datenum,t0) - fix the OOI time stamp and convert to python
+list_picker() - prints out a list and saves the selection number from the user input
+boolean_string(s) - this function helps with getting Boolean input to be used with the argparse capabilities in OOI_GUI_DataGrabber.py
 
 Dependencies: numpy, datetime, sys, os
 ======================================================================
