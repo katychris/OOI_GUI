@@ -5,6 +5,7 @@ HEG (5/25/2020)
 # imports
 import os, sys, shutil, re
 import requests
+import numpy as np
 import os, sys, shutil
 from datetime import timedelta, datetime
 import requests
