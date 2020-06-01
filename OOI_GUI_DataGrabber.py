@@ -8,7 +8,24 @@ import requests, argparse
 import time
 from datetime import datetime,timedelta, date
 import matplotlib.pyplot as plt
+import cmocean
 import ooi_mod # our very own module!
+
+# atuo-sense what machine you're working on and make suitable plotting choices
+# i.e. what kind of matplotlib import if on remote machine or not
+# copied all of this from Parker's 'remote_printing.py' script
+host = os.getenv('HOSTNAME')
+if host == None:
+    save_fig = False
+    print('Printing to screen')
+elif 'fjord' in host:
+    print('Printing to file')
+    import matplotlib as mpl
+    mpl.use('Agg')
+    save_fig = True
+else:
+    print('What machine is this?')
+    sys.exit()
 
 # Create an arparse argument
 # If f_update is turned on (True) the fil will reload 
@@ -24,6 +41,8 @@ print('An account with for OOI data portal is required to access this data. '+
 	'To create an account, visit: https://ooinet.oceanobservatories.org/ ')
 API_USERNAME = input('API Username: ')
 API_TOKEN = input('API Token: ')
+API_USERNAME = API_USERNAME.strip()
+API_TOKEN = API_TOKEN.strip(' ')
 
 # Create an error if there is no username or token
 class LoginError(Exception):
@@ -45,11 +64,11 @@ del a[-1:]# remove last two directories
 dir_path = '/'.join(a)
 
 # make an input data directory:
-in_dir = dir_path+'/'+dir_name+'_data/'
+in_dir = dir_path+'/'+dir_name+'_data'
 ooi_mod.make_dir(in_dir)
 
 # make an output data directory:
-out_dir = dir_path+'/'+dir_name+'_output/'
+out_dir = dir_path+'/'+dir_name+'_output'
 ooi_mod.make_dir(out_dir)
 
 # Get the station information loaded here
@@ -270,7 +289,7 @@ else:
 			selected_datasets = ooi_mod.get_data(url)
 		# If the time series is long (>1000 days) for a shallow station
 		# We wait 15 minutes for the data to settle in the server
-		elif time_diff.days>1000 and ('Shallow' in Station):
+		elif (time_diff.days>1000) and ('Shallow' in Station):
 			print('Waiting...')
 			time.sleep(30)
 			print('Initializing dataset for shallow station (15 minutes)...')
@@ -296,7 +315,7 @@ else:
 			'seawater_conductivity','conductivity','id'])
 
 		# Reformat the coordinates and rename the variables so it matches the deep stations
-		ds1 = ds1.reset_coords(['seawater_pressure','lon','lat','time'])
+		ds1 = ds1.reset_coords(['seawater_pressure','lon','lat'])
 		ds1 = ds1.rename({'seawater_pressure':'pressure','seawater_temperature':'temp'})
 	elif 'Deep' in Station:
 		# Open the dataset and ignore the variables we don't need (there are a lot!)
@@ -311,11 +330,18 @@ else:
 
 	# Save the file
 	del ds1.attrs['_NCProperties'] # This is to deal with a bug with xarray
+	ds1 = ds1.swap_dims({'obs':'time'})
+	ds1 = ds1.resample(time='10Min',keep_attrs=True).mean(keep_attrs=True)
+	ds1 = ds1.swap_dims({'time':'obs'}) 
+	ds1 = ds1.assign_coords({'obs':np.arange(0,len(ds1['time']))})
+	ds1 = ds1.reset_coords(['time'])
+	
 	if fdep:
 		os.remove(fname)
 	ds1.to_netcdf(fname, mode='w',format='netCDF4')
-	
+
 	ds = nc.Dataset(fname)
+
 	print(fname)
 	print('Done!')
 
@@ -324,59 +350,126 @@ else:
 
 # Manipulating data
 #---------------------------------------------------------------------------------------------------
-print('\nConverting netCDF to pandas dataframe...')
-# relevant fields from netcdf file
-flds = ['time','pressure','practical_salinity','temp','density']
-units = []
-fillval = []
-for jj in range (0,len(flds)):
-    units.append(ds[flds[jj]].units)
-    fillval.append(ds[flds[jj]]._FillValue)
-
-print('Fixing timestamp...')
-# fix the time stamp:
-t_ooi = ds[flds[0]][:] # pull out the time from the netcdf
-t_ooi[t_ooi==fillval[0]]=np.nan # nan any bad vals
-if '1900' in units[0]: # there are two options for the reference year for the OOI time: 1900,1970
-    t0=datetime.toordinal(date(1900,1,1))
-elif '1970' in units[0]:
-    t0=datetime.toordinal(date(1970,1,1))
-
-# use this function to convert to a python datetime
-tt =[]
-for jj in range(0,len(t_ooi)):
-    tt.append(ooi_mod.ooi_to_datetime(t_ooi[jj],t0))
-
-# put the data into a pandas data frame for convenient storage
-df = pd.DataFrame(data=tt,columns=[flds[0]])
-for jj in range (1,len(flds)):
-    temp = ds[flds[jj]][:] #pull out data
-    temp[temp==fillval[jj]]=np.nan # nan any bad vals
-    df.insert(jj,flds[jj],ds[flds[jj]][:])
-
-# set the time (first col) as index:
-df.set_index('time',inplace=True)
+"""
+This code:
+1. Loads the downloaded netcdf data
+2. Converts the OOI time into Python time
+3. Creates a pandas dataframe with time, pressure, temperature, salinity, and density
+4. Saves the dataframe as a pickle file in the output folder
+Dependencies: numpy, datetime, netCDF4, pandas, sys, os, ooi_mod
+HEG (5/26/2020)
+"""
 
 # switch the .nc name to a pickle name and save in the output directory:
 fname1=fname.replace('nc','p')
-# save the dataframe as a pickle file
-df.to_pickle(fname1)
-print('\nSaving pickle file of pandas dataframe!')
-print('Done!')
+
+if os.path.isfile(fname1) and not f_update:
+	print('Using saved pickle file...')
+	print('Done!')
+
+else:
+	print('\nConverting netCDF to pandas dataframe...')
+	# relevant fields from netcdf file
+	flds = ['time','pressure','practical_salinity','temp','density']
+	units = []
+	fillval = [np.nan]
+	for jj in range (0,len(flds)):
+	    units.append(ds[flds[jj]].units)
+	    if jj>0:
+		    fillval.append(ds[flds[jj]]._FillValue)
+
+	print('Fixing timestamp...')
+	# fix the time stamp:
+	t_ooi = ds[flds[0]][:] # pull out the time from the netcdf
+	t0 = datetime.toordinal(datetime.strptime(units[0].split()[-2]+' '+units[0].split()[-1], '%Y-%m-%d %H:%M:%S'))
+	# t_ooi[t_ooi==fillval[0]]=np.nan # nan any bad vals
+	# if '1900' in units[0]: # there are two options for the reference year for the OOI time: 1900,1970
+	#     t0=datetime.toordinal(date(1900,1,1))
+	# elif '1970' in units[0]:
+	#     t0=datetime.toordinal(date(1970,1,1))
+
+	# use this function to convert to a python datetime
+	tt =[]
+	for jj in range(0,len(t_ooi)):
+	    tt.append(ooi_mod.ooi_to_datetime(t_ooi[jj]*3600,t0))
+
+	# put the data into a pandas data frame for convenient storage
+	df = pd.DataFrame(data=tt,columns=[flds[0]])
+	for jj in range (1,len(flds)):
+	    temp = ds[flds[jj]][:] #pull out data
+	    temp[temp==fillval[jj]]=np.nan # nan any bad vals
+	    df.insert(jj,flds[jj],ds[flds[jj]][:])
+
+	# set the time (first col) as index:
+	df.set_index('time',inplace=True)
+	if os.path.isfile(fname1):
+		os.remove(fname)
+	# save the dataframe as a pickle file
+	df.to_pickle(fname1)
+	print('\nSaving pickle file of pandas dataframe!')
+	print('Done!')
 # save the metadata as a pickle file:
 # pickle.dump(units, open('meta_'+save_name, 'wb')) # 'wb' is for write binary
 
 
-# Plotting initial!
-#---------------------------------------------------------------------------------------------------
-# plt.close('all')
+# # Plotting initial!
+# #---------------------------------------------------------------------------------------------------
+# """
+# This code plots a measured CTD parameter (T, S, P, rho) in depth v time space.
+# Meant to be run immediately after 'OOI_GUI_DataLoader.py' script
+# Dependencies: sys, os, numpy, pandas, matplotlib.pyplot, cmocean
+# TLW - 5/28/2020
+# """
+# # read in pickle file
+# df = pd.read_pickle(fname1)
 
-# fig = plt.figure() 
-# ax1 = fig.add_subplot(111)
-# xx = ax1.scatter(ds['time'],ds['seawater_pressure'],c=ds['seawater_temperature']) 
+# # make a figure object with axes of pressure v time
+# # time is stored as index of DataFrame df
+# x = df.index
+# y = df['pressure']
+# temp = df['temp']
+# ps = df['practical_salinity']
+# rho = df['density']
+
+# print('Making plots...')
+# # make figure with three subplots for three variables
+# plt.close('all')
+# f, (ax1, ax2, ax3) = plt.subplots(3,1)
+# cm_temp = cmocean.cm.thermal  # assign a colormap to temperature
+# cm_ps = cmocean.cm.haline  # assign a colormap to practical salinity
+# cm_rho = cmocean.cm.dense  # assign a colormap to density
+# t_utc = 'Time (UTC)'  #assign variable to time label
+
+# # plot temperature as a function of pressure and time
+# ax1.scatter(x, y,linewidth=3, label='Temperature', c=temp, cmap=cm_temp)
 # ax1.invert_yaxis()
-# plt.colorbar(xx,label='Temperature (degC)')
-# ax1.set_xlabel('Time')
+# ax1.legend(loc='lower left')
+# ax1.set_title('Tempterature by depth, time')
+# ax1.set_xlabel(t_utc)
 # ax1.set_ylabel('Pressure (dbar)')
-# ax1.set_xlim([np.nanmin(ds['time']),np.nanmax(ds['time'])])
-# plt.show()
+# ax1.set_xlim([np.nanmin(x),np.nanmax(x)])
+
+# # plot practical salinity as a function of pressure and time
+# ax2.scatter(x, y, linewidth=3, label='Practical Salinity', c=ps, cmap=cm_ps)
+# ax2.legend(loc='lower left')
+# ax2.set_title('Salinity by depth, time')
+# ax2.set_xlabel(t_utc)
+# ax2.set_ylabel('Practical Salinity (PSU)')
+# ax1.set_xlim([np.nanmin(x),np.nanmax(x)])
+
+# # plot density as a function of pressure and time
+# ax3.scatter(x, y, linewidth=3, label='Density', c=rho, cmap=cm_rho)
+# ax3.invert_yaxis()
+# ax3.legend(loc='lower left')
+# ax3.set_title('Density by depth, time')
+# ax3.set_xlabel(t_utc)
+# ax3.set_ylabel('$Density (kg/m^{3}$')  #note to self: double-check this later
+# ax1.set_xlim([np.nanmin(x),np.nanmax(x)])
+
+# # save and show figures
+# fig_title = fname.split('/')[-1][:-3]
+# fig_name = out_dir + fig_title + '_plots.png'
+# if save_fig:
+# 	plt.savefig(out_dir)
+# elif not save_fig:
+# 	plt.show()
