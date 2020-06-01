@@ -7,14 +7,14 @@ import pandas as pd
 import requests, argparse
 import time
 from datetime import datetime,timedelta, date
+# import cartopy.crs as ccrs 
+# from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+# from cartopy import config
+# import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
-import cartopy.crs as ccrs 
-from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
-from cartopy import config
-import cartopy.feature as cfeature
-from matplotlib import colors
-from matplotlib import cm
-from matplotlib.colors import LinearSegmentedColormap, ListedColormap
+# from matplotlib import colors
+# from matplotlib import cm
+# from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import cmocean
 import ooi_mod # our very own module!
 
@@ -90,10 +90,8 @@ fs = 12 #Font size
 
 #Code to grab gebco bathymetry data
 # Set the maximum and minimum lats and lons
-lat_min = 43
-lat_max = 48
-lon_min = -131
-lon_max = -120
+lat_min = 43; lat_max = 48
+lon_min = -131; lon_max = -120
 
 # This gets the index values for the lats and lons selected above
 # 3600 arc seconds per degree, GEBCO is 15 arc second resolution, indexing starts at -180 lon and -90 lat
@@ -116,29 +114,25 @@ z_min = z.min()
 gebco.close()
 
 # plot data
-projection=ccrs.Mercator()
-extent = [lon_min, lon_max, lat_min, lat_max] #Set data extent
+# extent = [lon_min, lon_max, lat_min, lat_max] #Set data extent
 
 print('Making a map!')
+
+plt.close('all')
 fig = plt.figure(figsize=(10, 8))  #set figure size and projection                    
-ax = fig.add_subplot(111, projection=projection)
-ax.set_extent(extent, crs=ccrs.PlateCarree())
+# ax = fig.add_subplot(111, projection=projection)
+ax = fig.add_subplot(111)
+
 cmap = cmocean.tools.crop(cmocean.cm.topo, vmin = z_min, vmax = z_max, pivot = 0) #Adjust color bar to show land and ocean
-cs = ax.pcolormesh(g_lon, g_lat, z, cmap = cmap, transform=ccrs.PlateCarree()) #Plot bathymetry/elevation data with ocean color map
+cs = ax.pcolormesh(g_lon, g_lat, z, cmap = cmap)
 cbar = fig.colorbar(cs,pad=0.1) #Show color bar
 cbar.set_label('Elevation (m)', rotation=270)  #Label color bar
-
-#Format cartopy map
-gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,linewidth=0)
-gl.top_labels = True
-gl.bottom_labels = False 
-gl.right_labels = False
-gl.left_labels = True
-gl.xlines = False
-gl.xformatter = LONGITUDE_FORMATTER
-gl.yformatter = LATITUDE_FORMATTER
-gl.xlabel_style = {'weight' : 'bold'}
-gl.ylabel_style = {'weight' : 'bold'}
+ax.xaxis.tick_top()
+ax.set_xlabel('Longitude', size=fs,fontweight='bold')
+ax.xaxis.set_label_position('top') 
+ax.set_ylabel('Latitude', size=fs,fontweight='bold')
+ax.tick_params(labelsize=fs)
+dar(ax)
 
 #Load in pickle file of station locations
 st_df = pd.read_pickle('Station_Info.pkl')
@@ -147,12 +141,12 @@ st_lat = st_df['Lat'].astype(float)
 st_lon = st_df['Lon'].astype(float)
 
 # add station locations and labels
-ax.plot(st_lon,st_lat , '#652666', marker = 'o', markersize=7, linewidth = 0, transform=ccrs.PlateCarree())
-ax.text(st_lon['Oregon_Offshore_Deep'], st_lat['Oregon_Offshore_Deep']-0.3,'Oregon Offshore', weight = 'bold', horizontalalignment='right', transform=ccrs.PlateCarree(),
+ax.plot(st_lon,st_lat , '#652666', marker = 'o', markersize=7, linewidth = 0)
+ax.text(st_lon['Oregon_Offshore_Deep'], st_lat['Oregon_Offshore_Deep']-0.3,'Oregon Offshore', weight = 'bold', horizontalalignment='right',
     bbox=dict(facecolor='w', edgecolor='None', alpha=0.3))  
-ax.text(st_lon['Slope_Base_Deep']-0.4, st_lat['Slope_Base_Deep']+ 0.205,'Slope Base', weight = 'bold', transform=ccrs.PlateCarree(),
+ax.text(st_lon['Slope_Base_Deep']-0.4, st_lat['Slope_Base_Deep']+ 0.205,'Slope Base', weight = 'bold',
     bbox=dict(facecolor='w', edgecolor='None', alpha=0.3))
-ax.text(st_lon['Axial_Base_Deep'], st_lat['Axial_Base_Deep']+0.18,'Axial Base', weight = 'bold',transform=ccrs.PlateCarree(),
+ax.text(st_lon['Axial_Base_Deep'], st_lat['Axial_Base_Deep']+0.18,'Axial Base', weight = 'bold',
     bbox=dict(facecolor='w', edgecolor='None', alpha=0.3))
 
 # Save the plot by calling plt.savefig() BEFORE plt.show()
