@@ -8,6 +8,13 @@ import requests, argparse
 import time
 from datetime import datetime,timedelta, date
 import matplotlib.pyplot as plt
+import cartopy.crs as ccrs 
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+from cartopy import config
+import cartopy.feature as cfeature
+from matplotlib import colors
+from matplotlib import cm
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import cmocean
 import ooi_mod # our very own module!
 
@@ -78,29 +85,84 @@ st_df = pd.read_pickle('./Station_Info.pkl')
 
 # Mapping
 #---------------------------------------------------------------------------------------------------
-# Write this as a function?
+#Set formatting variables to use in the whole code
+fs = 12 #Font size
 
-# # Read the map data
-# # Set the maximum and minimum lats and lons
-# lat_min = 43
-# lat_max = 48
-# lon_min = -131
-# lon_max = -120
+#Code to grab gebco bathymetry data
+# Set the maximum and minimum lats and lons
+lat_min = 43
+lat_max = 48
+lon_min = -131
+lon_max = -120
 
-# # This gets the index values for the lats and lons selected above
-# # 3600 arc seconds per degree, GEBCO 15 arc second res, indexing starts -180 lon and -90 lat
-# lat_min = (lat_min + 90) * 240; lat_max = (lat_max + 90) * 3600/15 
-# lon_min = (lon_min + 180) * 240; lon_max = (lon_max + 180) * 3600/15
+# This gets the index values for the lats and lons selected above
+# 3600 arc seconds per degree, GEBCO is 15 arc second resolution, indexing starts at -180 lon and -90 lat
+lat_min_index = (lat_min + 90) * 240; lat_max_index = (lat_max + 90) * 3600/15 
+lon_min_index = (lon_min + 180) * 240; lon_max_index = (lon_max + 180) * 3600/15
 
-# # This is the link to select out just the data we want, lot of string formatting :)
-# url1 = 'http://tds.marine.rutgers.edu/thredds/dodsC/other/bathymetry/GEBCO_2019/GEBCO_2019.nc?'
-# url = url1+'lat[%d:1:%d],lon[%d:1:%d],elevation[%d:1:%d][%d:1:%d]'%(
-# 	lat_min,lat_max,lon_min,lon_max,lat_min,lat_max,lon_min,lon_max)
+# This is the link to select out just the data we want, lot of string formatting :)
+print('\nGetting bathymetry/topography data...')
+url = 'http://tds.marine.rutgers.edu/thredds/dodsC/other/bathymetry/GEBCO_2019/GEBCO_2019.nc?lat[%d:1:%d],lon[%d:1:%d],elevation[%d:1:%d][%d:1:%d]'%(lat_min_index,lat_max_index,lon_min_index,lon_max_index,lat_min_index,lat_max_index,lon_min_index,lon_max_index)
 
-# # Read in the data using netCDF4
-# topography = nc.Dataset(url)
+# Read in the data using netCDF4
+gebco = nc.Dataset(url)
 
-# Put Map here!
+#Code based off of https://stackoverflow.com/questions/38246282/contour-data-with-cartopy
+g_lon = gebco.variables['lon'][:]
+g_lat = gebco.variables['lat'][:]
+z = gebco.variables['elevation'][:]
+z_max = z.max()
+z_min = z.min()
+gebco.close()
+
+# plot data
+projection=ccrs.Mercator()
+extent = [lon_min, lon_max, lat_min, lat_max] #Set data extent
+
+print('Making a map!')
+fig = plt.figure(figsize=(10, 8))  #set figure size and projection                    
+ax = fig.add_subplot(111, projection=projection)
+ax.set_extent(extent, crs=ccrs.PlateCarree())
+cmap = cmocean.tools.crop(cmocean.cm.topo, vmin = z_min, vmax = z_max, pivot = 0) #Adjust color bar to show land and ocean
+cs = ax.pcolormesh(g_lon, g_lat, z, cmap = cmap, transform=ccrs.PlateCarree()) #Plot bathymetry/elevation data with ocean color map
+cbar = fig.colorbar(cs,pad=0.1) #Show color bar
+cbar.set_label('Elevation (m)', rotation=270)  #Label color bar
+
+#Format cartopy map
+gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,linewidth=0)
+gl.top_labels = True
+gl.bottom_labels = False 
+gl.right_labels = False
+gl.left_labels = True
+gl.xlines = False
+gl.xformatter = LONGITUDE_FORMATTER
+gl.yformatter = LATITUDE_FORMATTER
+gl.xlabel_style = {'weight' : 'bold'}
+gl.ylabel_style = {'weight' : 'bold'}
+
+#Load in pickle file of station locations
+st_df = pd.read_pickle('Station_Info.pkl')
+st_df['Station'] = st_df.index.copy()
+st_lat = st_df['Lat'].astype(float)
+st_lon = st_df['Lon'].astype(float)
+
+# add station locations and labels
+ax.plot(st_lon,st_lat , '#652666', marker = 'o', markersize=7, linewidth = 0, transform=ccrs.PlateCarree())
+ax.text(st_lon['Oregon_Offshore_Deep'], st_lat['Oregon_Offshore_Deep']-0.3,'Oregon Offshore', weight = 'bold', horizontalalignment='right', transform=ccrs.PlateCarree(),
+    bbox=dict(facecolor='w', edgecolor='None', alpha=0.3))  
+ax.text(st_lon['Slope_Base_Deep']-0.4, st_lat['Slope_Base_Deep']+ 0.205,'Slope Base', weight = 'bold', transform=ccrs.PlateCarree(),
+    bbox=dict(facecolor='w', edgecolor='None', alpha=0.3))
+ax.text(st_lon['Axial_Base_Deep'], st_lat['Axial_Base_Deep']+0.18,'Axial Base', weight = 'bold',transform=ccrs.PlateCarree(),
+    bbox=dict(facecolor='w', edgecolor='None', alpha=0.3))
+
+# Save the plot by calling plt.savefig() BEFORE plt.show()
+fig_name = 'OOI_GUI_Bathymetry.png'
+if save_fig:
+	plt.savefig(out_dir)
+	print('Map Saved!')
+elif not save_fig:
+	plt.show()
+	print('Map displayed!')
 
 
 # User Selections - Stations and time range
@@ -153,6 +215,7 @@ elif ini == len(opts)-1:
 	if checky.lower().startswith('y') or len(checky)==0:
 		start_time = tos[ini-1][0]
 		end_time = tos[ini-1][1]
+		print('Full Time Selected')
 	else:
 		print('\nExiting!')
 		sys.exit()
@@ -188,8 +251,8 @@ elif ini == len(opts):
 		raise TimeError('Please select a time within the given range.')
 	print('\nTime Range: ',start_time,' to ',end_time,'\n')
 
-
-
+if not save_fig:
+	plt.close('all')
 # Retrieving Data
 #---------------------------------------------------------------------------------------------------
 # Make the start and end times into useable strings
@@ -201,8 +264,7 @@ fname = in_dir+'/'+Station+'_'+'_'.join([start_time,end_time])+'.nc'
 
 # If this file already exists (and the user does not want to update), pull from there!
 if os.path.isfile(fname) and not f_update:
-	print(fname)
-	print('\nDone!')
+	print('\nUsing saved netCDF file...')
 	ds = nc.Dataset(fname)
 	
 # Otherwise pull from the THREDDS server
@@ -284,13 +346,13 @@ else:
 	if not fdep:
 		# If the time series is relatively short (or if there isn't much data - Deep)
 		# We wait 60 extra seconds to let the data all settle in the server
-		if time_diff.days<=1000 or 'Deep' in Station:
+		if time_diff.days<=730 or 'Deep' in Station:
 			print('Initializing Dataset...')
 			time.sleep(90)
 			selected_datasets = ooi_mod.get_data(url)
 		# If the time series is long (>1000 days) for a shallow station
 		# We wait 15 minutes for the data to settle in the server
-		elif (time_diff.days>1000) and ('Shallow' in Station):
+		elif (time_diff.days>730) and ('Shallow' in Station):
 			print('Waiting...')
 			time.sleep(30)
 			print('Initializing dataset for shallow station (15 minutes)...')
@@ -299,7 +361,7 @@ else:
 
 	# Print statements!
 	print('Data is loaded!')
-	print('\nExtracting and Saving...')	
+	print('\nExtracting and Saving... This will take a moment.')	
 
 	# We should now be able to get all of the data into a structure using netCDF4
 	# if len(selected_datasets) == 1:
@@ -346,9 +408,6 @@ else:
 
 	# Open the file that we just saved
 	ds = nc.Dataset(fname)
-
-	print(fname)
-	print('Done!')
 	
 	
 
@@ -368,8 +427,10 @@ HEG (5/26/2020)
 fname1=fname.replace('nc','p')
 
 if os.path.isfile(fname1) and not f_update:
-	print('Using saved pickle file...')
-	print('Done!')
+	print('\nUsing saved pickle file...')
+	print('\nUse the following path as the input to OOI_GUI_DataPlotter.py:')
+	print(fname1)
+	print('\nDone!')
 
 else:
 	print('\nConverting netCDF to pandas dataframe...')
@@ -378,9 +439,9 @@ else:
 	units = []
 	fillval = [np.nan]
 	for jj in range (0,len(flds)):
-	    units.append(ds[flds[jj]].units)
-	    if jj>0:
-		    fillval.append(ds[flds[jj]]._FillValue)
+		units.append(ds[flds[jj]].units)
+		if jj>0:
+			fillval.append(ds[flds[jj]]._FillValue)
 
 	print('Fixing timestamp...')
 	# fix the time stamp:
@@ -389,11 +450,6 @@ else:
 	t01 = datetime.toordinal(t00)
 	H0 = t00.hour/24; M0 = t00.minute/(24*60); S0 = t00.second/(24*3600)
 	t0 = t01+H0+M0+S0
-	# t_ooi[t_ooi==fillval[0]]=np.nan # nan any bad vals
-	# if '1900' in units[0]: # there are two options for the reference year for the OOI time: 1900,1970
-	#     t0=datetime.toordinal(date(1900,1,1))
-	# elif '1970' in units[0]:
-	#     t0=datetime.toordinal(date(1970,1,1))
 
 	# use this function to convert to a python datetime
 	tt =[]
@@ -413,70 +469,9 @@ else:
 		os.remove(fname)
 	# save the dataframe as a pickle file
 	df.to_pickle(fname1)
-	print('\nSaving pickle file of pandas dataframe!')
-	print('Done!')
+	print('\nSaving pickle file of pandas dataframe...')
+	print('\nUse the following path as the input to OOI_GUI_DataPlotter.py:')
+	print(fname1)
+	print('\nDone!')
 # save the metadata as a pickle file:
 # pickle.dump(units, open('meta_'+save_name, 'wb')) # 'wb' is for write binary
-
-
-# # Plotting initial!
-# #---------------------------------------------------------------------------------------------------
-# """
-# This code plots a measured CTD parameter (T, S, P, rho) in depth v time space.
-# Meant to be run immediately after 'OOI_GUI_DataLoader.py' script
-# Dependencies: sys, os, numpy, pandas, matplotlib.pyplot, cmocean
-# TLW - 5/28/2020
-# """
-# # read in pickle file
-# df = pd.read_pickle(fname1)
-
-# # make a figure object with axes of pressure v time
-# # time is stored as index of DataFrame df
-# x = df.index
-# y = df['pressure']
-# temp = df['temp']
-# ps = df['practical_salinity']
-# rho = df['density']
-
-# print('Making plots...')
-# # make figure with three subplots for three variables
-# plt.close('all')
-# f, (ax1, ax2, ax3) = plt.subplots(3,1)
-# cm_temp = cmocean.cm.thermal  # assign a colormap to temperature
-# cm_ps = cmocean.cm.haline  # assign a colormap to practical salinity
-# cm_rho = cmocean.cm.dense  # assign a colormap to density
-# t_utc = 'Time (UTC)'  #assign variable to time label
-
-# # plot temperature as a function of pressure and time
-# ax1.scatter(x, y,linewidth=3, label='Temperature', c=temp, cmap=cm_temp)
-# ax1.invert_yaxis()
-# ax1.legend(loc='lower left')
-# ax1.set_title('Tempterature by depth, time')
-# ax1.set_xlabel(t_utc)
-# ax1.set_ylabel('Pressure (dbar)')
-# ax1.set_xlim([np.nanmin(x),np.nanmax(x)])
-
-# # plot practical salinity as a function of pressure and time
-# ax2.scatter(x, y, linewidth=3, label='Practical Salinity', c=ps, cmap=cm_ps)
-# ax2.legend(loc='lower left')
-# ax2.set_title('Salinity by depth, time')
-# ax2.set_xlabel(t_utc)
-# ax2.set_ylabel('Practical Salinity (PSU)')
-# ax1.set_xlim([np.nanmin(x),np.nanmax(x)])
-
-# # plot density as a function of pressure and time
-# ax3.scatter(x, y, linewidth=3, label='Density', c=rho, cmap=cm_rho)
-# ax3.invert_yaxis()
-# ax3.legend(loc='lower left')
-# ax3.set_title('Density by depth, time')
-# ax3.set_xlabel(t_utc)
-# ax3.set_ylabel('$Density (kg/m^{3}$')  #note to self: double-check this later
-# ax1.set_xlim([np.nanmin(x),np.nanmax(x)])
-
-# # save and show figures
-# fig_title = fname.split('/')[-1][:-3]
-# fig_name = out_dir + fig_title + '_plots.png'
-# if save_fig:
-# 	plt.savefig(out_dir)
-# elif not save_fig:
-# 	plt.show()
