@@ -9,9 +9,11 @@ TLW - 06/01/2020
 import sys, os
 import numpy as np
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import cmocean
 import ooi_mod
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 
 # atuo-sense what machine you're working on and make suitable plotting choices
 # i.e. what kind of matplotlib import if on remote machine or not
@@ -19,16 +21,12 @@ import ooi_mod
 host = os.getenv('HOSTNAME')
 if host == None:
     save_fig = False
-    print('Printing to screen')
 elif 'fjord' in host:
-    print('Printing to file')
-    import matplotlib as mpl
     mpl.use('Agg')
     save_fig = True
 else:
     print('What machine is this?')
     sys.exit()
-import matplotlib.pyplot as plt
 
 # get the current working directory then only keep name up 2 levels
 # this will be used as the root for /code, /ooi_data, /ooi_output:
@@ -43,7 +41,9 @@ out_dir = dir_path+'/'+dir_name+'_output'
 ooi_mod.make_dir(out_dir)
 
 # read in pickle file
-fname1 = input("Station File Name")
+fname1 = input("Station File Path (from OOI_GUI_DataGrabber.py): ")
+fname1 = fname1.strip()
+print('\nReading data...')
 df = pd.read_pickle(fname1)
 
 # make a figure object with axes of pressure v time
@@ -56,44 +56,58 @@ rho = df['density']
 
 # make figure with three subplots for three variables
 plt.close('all')
+print('Making figure...')
 fig, (ax1, ax2, ax3) = plt.subplots(1,3, sharey=True)
+
 cm_temp = cmocean.cm.tempo  # assign a colormap to temperature
 cm_ps = cmocean.cm.haline  # assign a colormap to practical salinity
 cm_rho = cmocean.cm.dense  # assign a colormap to density
 t_utc = 'Time (UTC)'  #assign variable to time label
 
+print('Creating temperature axis...')
 # plot temperature as a function of pressure and time
-sc1 = ax1.scatter(x, y, c=temp, vmin=np.nanmin(temp), vmax=np.nanmax(temp), cmap=cm_temp)
+sc1 = ax1.scatter(x, y, c=temp, vmin=np.nanmin(temp), vmax=np.nanmax(temp), cmap=cm_temp) # vmin=0, vmax=35,
 ax1.tick_params(axis='x', direction='in', labelrotation=70)
 ax1.tick_params(axis='y', direction='in')
 ax1.invert_yaxis()
+ax1.set_xlim([np.min(x)-timedelta(days=5),np.max(x)+timedelta(days=5)])
 ax1.set_title('Temperature $(C)$')
 ax1.set_xlabel(t_utc)
 ax1.set_ylabel('Pressure (dbar)')
 cbar1 = fig.colorbar(sc1, ax=ax1)
 
+print('Creating Salinity axis...')
 # plot practical salinity as a function of pressure and time
-sc2 = ax2.scatter(x, y, c=ps, vmin=np.nanmin(ps), vmax=np.nanmax(ps), cmap=cm_ps)
+sc2 = ax2.scatter(x, y, c=ps, vmin=np.nanmin(ps), vmax=np.nanmax(ps), cmap=cm_ps) # vmin=30, vmax=35
 ax2.tick_params(axis='x', direction='in', labelrotation=70)
 ax2.tick_params(axis='y', direction='in')
 ax2.invert_yaxis()
+ax2.set_xlim([np.min(x)-timedelta(days=5),np.max(x)+timedelta(days=5)])
 ax2.set_title('Salinity $(PSU)$')
 ax2.set_xlabel(t_utc)
 cbar2 = fig.colorbar(sc2, ax=ax2)
 
+print('Creating density axis...')
 # plot density as a function of pressure and time
-sc3 = ax3.scatter(x, y, c=rho, vmin=np.nanmin(rho), vmax=np.nanmax(rho), cmap=cm_rho)
+sc3 = ax3.scatter(x, y, c=rho, vmin=np.nanmin(rho), vmax=np.nanmax(rho), cmap=cm_rho) # vmin=1024, vmax=1030
 ax3.tick_params(axis='x', direction='in', labelrotation=70)
 ax3.tick_params(axis='y', direction='in')
 ax3.invert_yaxis()
+ax3.set_xlim([np.min(x)-timedelta(days=5),np.max(x)+timedelta(days=5)])
 ax3.set_title('Density $(kg/m^{3})$')
 ax3.set_xlabel(t_utc)
 cbar3 = fig.colorbar(sc3, ax=ax3, use_gridspec=True)
 
+plt.suptitle(' '.join(fname1.split('/')[-1][:-2].replace('.000Z','').split('_')),fontsize=18,fontweight='bold')
+plt.subplots_adjust(top=0.85)
+
 # save and show figures
-fig_name = fname1.replace('.p','.png')
-plt.tight_layout()
+fig_name = fname1.replace('.p','.png').split('/')[-1]
+# plt.tight_layout()
 if save_fig:
-	plt.savefig(out_dir)
+	print('\nPrinting figure to file!')
+	fig.set_size_inches(12,8)
+	plt.savefig(out_dir+'/'+fig_name)
 elif not save_fig:
+	print('\nPrinting figure to screen!')
 	plt.show()
