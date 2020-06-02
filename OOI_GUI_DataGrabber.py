@@ -1,5 +1,5 @@
 # imports
-import os,sys,re
+import os,sys
 import numpy as np
 import netCDF4 as nc
 import xarray as xr
@@ -105,7 +105,7 @@ station_info = {'Oregon_Offshore_Deep':
 
 st_df = pd.DataFrame.from_dict(station_info, orient='index',
 	columns=['Site','Node','Instrument','Method','Stream','Start_Date','End_Date','Lat','Lon'])
-st_df.to_pickle('./Station_Info.pkl')
+st_df.to_pickle('./Station_Info.p')
 
 # Mapping
 #---------------------------------------------------------------------------------------------------
@@ -212,7 +212,11 @@ opts = [tos[0][0].strftime('%Y-%m-%d')+' to '+tos[0][1].strftime('%Y-%m-%d')+' (
 		'Custom Date Range']
 
 # Print out the time options numbered for user selection
-my_choice = ooi_mod.list_picker('Time Selection',opts)
+if 'Deep' in Station:
+	my_choice = ooi_mod.list_picker('Time Selection',opts,default_val=4)
+else:
+	my_choice = ooi_mod.list_picker('Time Selection',opts)
+
 ini = int(my_choice)
 
 # Go through the user's option saving the start and end times
