@@ -41,6 +41,7 @@ out_dir = dir_path+'/'+dir_name+'_output'
 ooi_mod.make_dir(out_dir)
 
 # read in pickle file
+print()
 fname1 = input("Station File Path (from OOI_GUI_DataGrabber.py): ")
 fname1 = fname1.strip()
 print('\nReading data...')
@@ -108,6 +109,11 @@ if save_fig:
 	print('\nPrinting figure to file!')
 	fig.set_size_inches(12,8)
 	plt.savefig(out_dir+'/'+fig_name)
+	print('\nYou can scp the figure from the following path:')
+	print(out_dir+'/'+fig_name)
+	print('\nDone!')
 elif not save_fig:
 	print('\nPrinting figure to screen!')
 	plt.show()
+	print('\nDone!')
+
