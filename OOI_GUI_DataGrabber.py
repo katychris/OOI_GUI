@@ -154,7 +154,7 @@ ax.tick_params(labelsize=fs)
 ooi_mod.dar(ax)
 
 #Load in pickle file of station locations
-st_df = pd.read_pickle('./Station_Info.pkl')
+st_df = pd.read_pickle('./Station_Info.p')
 st_df['Station'] = st_df.index.copy()
 st_lat = st_df['Lat'].astype(float)
 st_lon = st_df['Lon'].astype(float)
