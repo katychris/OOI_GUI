@@ -60,7 +60,7 @@ plt.close('all')
 print('Making figure...')
 fig, (ax1, ax2, ax3) = plt.subplots(1,3, sharey=True)
 
-cm_temp = cmocean.cm.tempo  # assign a colormap to temperature
+cm_temp = cmocean.cm.tempo_r  # assign a colormap to temperature
 cm_ps = cmocean.cm.haline  # assign a colormap to practical salinity
 cm_rho = cmocean.cm.dense  # assign a colormap to density
 t_utc = 'Time (UTC)'  #assign variable to time label
