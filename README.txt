@@ -16,7 +16,7 @@ Output: map of station locations, netcdf file with CTD data, and pickle file wit
 DataFrame structure:
 index = Time (UTC)	Pressure (dbar)	Temperature (deg_C)	Salinity (PSU)	Density (kg/m3)
 
-Station Location Options:
+Station Location Options: Oregon Offshore, Slope Base, Axial Base with shallow/deep for each
 
 Dependencies: numpy, datetime, time, netCDF4, xarray, pandas, sys, os, matplotlib.pyplot, cmocean, ooi_mod*
 
