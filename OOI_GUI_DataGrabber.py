@@ -1,3 +1,36 @@
+"""
+OOI_GUI_DataGrabber
+Written by: Katy Christensen, Hannah Glover, Susanna Michael, and Theresa Whorley
+
+Last Updated: June 8th, 2020
+
+Git: https://github.com/katychris/OOI_GUI.git
+
+This code is used for grabbing and formatting OOI Data.
+First it brings up a map of OOI Cabled Array stations with profiling CTD data. 
+The user selects one of the stations and the date range. 
+If no matching request exists on the requesting platform then a data request is created through the OOI Data Portal. 
+The data is then downloaded locally, loaded into a DataFrame, and saved as a pickle file.
+
+Input: 
+- API Username/Token: each user is issued a unique username and token when they register for an account with the OOI Data Portal (https://ooinet.oceanobservatories.org/) 
+- Station Names: there are 6 options available
+- Date Range: there are a few pre-made suggestions as well as a custom selection option
+- (Optional argparse) -f True/False: if f_update is turned on (True) the file will reload regardless of if it is already a file that exists
+
+Output: map of station locations, netcdf file with CTD data, and pickle file with CTD data in a pandas DataFrame
+
+DataFrame structure:
+index = Time (UTC)	Pressure (dbar)	Temperature (deg_C)	Salinity (PSU)	Density (kg/m3)
+
+Station Location Options: Oregon Offshore, Slope Base, Axial Base with shallow/deep for each
+
+Dependencies: numpy, datetime, time, netCDF4, xarray, pandas, sys, os, matplotlib.pyplot, cmocean, ooi_mod*
+* ooi_mod: custom package contained in Github
+
+"""
+
+
 # imports
 import os,sys
 import numpy as np
@@ -7,10 +40,8 @@ import pandas as pd
 import requests, argparse
 import time
 from datetime import datetime,timedelta, date
+import matplotlib as mpl
 import matplotlib.pyplot as plt
-# from matplotlib import colors
-# from matplotlib import cm
-# from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import cmocean
 import ooi_mod # our very own module!
 
@@ -20,10 +51,7 @@ import ooi_mod # our very own module!
 host = os.getenv('HOSTNAME')
 if host == None:
     save_fig = False
-    print('Printing to screen')
 elif 'fjord' in host:
-    print('Printing to file')
-    import matplotlib as mpl
     mpl.use('Agg')
     save_fig = True
 else:
@@ -32,7 +60,7 @@ else:
 
 # Create an arparse argument
 # If f_update is turned on (True) the fil will reload 
-#regardless of if it is already a file that exists
+# regardless of if it is already a file that exists
 # This is useful if there is a timeout or error while loading
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--file_update', default=False, type=ooi_mod.boolean_string)
@@ -174,6 +202,7 @@ if save_fig:
 	plt.savefig(out_dir+'/'+fig_name)
 	print('Map Saved!')
 elif not save_fig:
+	plt.savefig(out_dir+'/'+fig_name)
 	plt.show()
 	print('Map displayed!')
 
@@ -213,11 +242,13 @@ opts = [tos[0][0].strftime('%Y-%m-%d')+' to '+tos[0][1].strftime('%Y-%m-%d')+' (
 
 # Print out the time options numbered for user selection
 if 'Deep' in Station:
-	my_choice = ooi_mod.list_picker('Time Selection',opts,default_val=4)
+	my_choice = ooi_mod.list_picker('Time Selection',opts[3:])
+	ini = int(my_choice)+3
 else:
 	my_choice = ooi_mod.list_picker('Time Selection',opts)
+	ini = int(my_choice)
 
-ini = int(my_choice)
+
 
 # Go through the user's option saving the start and end times
 if (ini < len(opts)-1) and (ini>0):
@@ -270,6 +301,7 @@ elif ini == len(opts):
 
 if not save_fig:
 	plt.close('all')
+
 # Retrieving Data
 #---------------------------------------------------------------------------------------------------
 # Make the start and end times into useable strings
@@ -503,5 +535,3 @@ else:
 	print('\nUse the following path as the input to OOI_GUI_DataPlotter.py:')
 	print(fname1)
 	print('\nDone!\n')
-# save the metadata as a pickle file:
-# pickle.dump(units, open('meta_'+save_name, 'wb')) # 'wb' is for write binary
