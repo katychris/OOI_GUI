@@ -11,12 +11,12 @@ Input:
 - Station Names: there are 6 options available
 - Date Range: there are a few pre-made suggestions as well as a custom selection option
 
-Output: map of station locations, netcdf file with CTD data, and pickle file with CTD data in a pandas DataFrame
+Output: map of station locations, a pickle file with the station information (Station_Info.p) netcdf file with CTD data, and pickle file with CTD data in a pandas DataFrame
 
 DataFrame structure:
 index = Time (UTC)	Pressure (dbar)	Temperature (deg_C)	Salinity (PSU)	Density (kg/m3)
 
-Station Location Options:
+Station Location Options: Oregon Offshore, Slope Base, Axial Base with shallow/deep for each
 
 Dependencies: numpy, datetime, time, netCDF4, xarray, pandas, sys, os, matplotlib.pyplot, cmocean, ooi_mod*
 
@@ -36,3 +36,8 @@ Dependencies: numpy, datetime, sys, os
 The user can plot the data using OOI_GUI_DataPlotter.py. The script first checks if the user is running on a remote machine and then plots each variable in depth vs. time space.
 
 Dependencies: numpy, sys, os, pandas, matplotlib.pyplot, cmocean
+
+======================================================================
+* Station_Info.p
+This is a pickle file containing the station and instrument strings for each location option.
+This is an output of OOI_GUI_DataGrabber. 
