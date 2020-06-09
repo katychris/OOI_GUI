@@ -4,7 +4,7 @@ Written by: Katy Christensen, Hannah Glover, Susanna Michael, and Theresa Whorle
 
 Last Updated: June 8th, 2020
 
-Git: https://github.com/katychris/OOI_GUI.git
+GitHub: https://github.com/katychris/OOI_GUI.git
 
 This code is used for grabbing and formatting OOI Data.
 First it brings up a map of OOI Cabled Array stations with profiling CTD data. 
@@ -247,7 +247,6 @@ if 'Deep' in Station:
 else:
 	my_choice = ooi_mod.list_picker('Time Selection',opts)
 	ini = int(my_choice)
-
 
 
 # Go through the user's option saving the start and end times
