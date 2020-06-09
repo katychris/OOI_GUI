@@ -113,6 +113,8 @@ if save_fig:
 	print(out_dir+'/'+fig_name)
 	print('\nDone!')
 elif not save_fig:
+	fig.set_size_inches(12,8)
+	plt.savefig(out_dir+'/'+fig_name)
 	print('\nPrinting figure to screen!')
 	plt.show()
 	print('\nDone!')
